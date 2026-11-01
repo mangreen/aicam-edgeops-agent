@@ -24,7 +24,7 @@ async def search_issues(d, c, kind=None, lane=None):
 @box.tool("search_history", "搜尋歷史對話", {"query": _str("關鍵字")}, ("query",), level="L0", chat=True)
 async def search_history(d, c, query):
     rows = d.issues.msg_search(query)
-    return {"rows": rows, "summary": "；".join(f"[{_ago(r['ts'])} {r['role']}] {r['content'][:60]}" for r in rows) or "無相關歷史對話"}
+    return {"rows": rows, "summary": "；".join(f"[{_ago(r['ts'])}] 問：{r['q'][:40]} 答：{(r['a'] or '')[:70]}" for r in rows) or "無相關歷史對話"}
 
 
 TOOLS = box.tools

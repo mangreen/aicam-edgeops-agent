@@ -76,5 +76,7 @@ class SqliteIssues:
                                        "ORDER BY id DESC LIMIT ?", (session, limit))))
 
     def msg_search(self, q, limit=5):
-        return self.db.q("SELECT role,content,ts FROM messages WHERE content LIKE ? ORDER BY ts DESC LIMIT ?",
-                         (f"%{q}%", limit))
+        """只比對使用者提問，並附上緊接著的回答（避免搜到 Agent 自己的工具輸出）。"""
+        return self.db.q("SELECT u.content AS q, u.ts AS ts, (SELECT content FROM messages a WHERE a.id > u.id "
+                         "AND a.role='assistant' ORDER BY a.id LIMIT 1) AS a FROM messages u "
+                         "WHERE u.role='user' AND u.content LIKE ? ORDER BY u.ts DESC LIMIT ?", (f"%{q}%", limit))

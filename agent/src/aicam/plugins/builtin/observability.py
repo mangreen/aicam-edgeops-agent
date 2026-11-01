@@ -30,7 +30,9 @@ async def query_logs(d, c, lane=None, contains=None, since_hours=1, limit=10):
     rows = d.obs.logs(lane, contains, since, limit)
     last = f"，最近一次 {_ago(rows[0]['ts'])}" if rows else ""
     where = f"Lane {lane} " if lane else ""
-    return {"count": n, "rows": rows, "summary": f"{where}近 {since_hours:g} 小時符合「{contains or '全部'}」的 log 共 {n} 筆{last}"}
+    recent = "；".join(f"{r['level']} {r['msg'][:90]}" for r in rows[:3])      # 外部內容：由 content guard 把關
+    return {"count": n, "rows": rows, "summary": f"{where}近 {since_hours:g} 小時符合「{contains or '全部'}」的 log 共 {n} 筆{last}"
+            + (f"。最近：{recent}" if recent else "")}
 
 
 @box.tool("query_metrics", "查詢 metrics 統計", {"lane": _int("車道"), "name": _str("fps|stream_connected|detections_per_min"), "since_hours": {"type": "number"}}, ("lane",), level="L0", chat=True)
