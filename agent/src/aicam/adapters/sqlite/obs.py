@@ -1,5 +1,4 @@
 """ObservabilityPort 的 SQLite 實作（POC）。正式版換成 Loki / Prometheus / Tempo。"""
-import json, time
 
 
 class SqliteObs:

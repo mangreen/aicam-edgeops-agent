@@ -1,5 +1,6 @@
 """雲端優先，失敗自動退回 Mock。"""
 import time
+
 from .mock import MockLLM
 
 

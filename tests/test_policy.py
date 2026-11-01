@@ -1,4 +1,5 @@
 import time
+
 from aicam.core import policy
 
 NOW = time.time()

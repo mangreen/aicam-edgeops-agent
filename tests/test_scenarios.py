@@ -1,7 +1,8 @@
 import asyncio
-from conftest import emit
-from aicam.plugins.tools import Call, execute
+
 from aicam.core import chat
+from aicam.plugins.tools import Call, execute
+from conftest import emit
 
 
 async def _pending(d, to, timeout=5):

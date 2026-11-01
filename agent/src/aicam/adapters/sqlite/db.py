@@ -1,4 +1,5 @@
-import sqlite3, threading
+import sqlite3
+import threading
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS logs(id INTEGER PRIMARY KEY, ts REAL, lane INT, level TEXT, msg TEXT);
@@ -21,6 +22,8 @@ TABLES = ["logs", "metrics", "spans", "issues", "events", "actions", "escalation
 
 
 class DB:
+    """單一連線 + RLock。同步 SQLite 在 async handler 內呼叫：查詢皆為毫秒級小查詢，POC 可接受
+    （見 docs/review.md #10）；高負載時改 Postgres adapter 或 run_in_executor。"""
     def __init__(self, path=":memory:"):
         self.conn = sqlite3.connect(path, check_same_thread=False, isolation_level=None)
         self.conn.row_factory = sqlite3.Row

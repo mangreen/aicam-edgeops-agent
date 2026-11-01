@@ -1,5 +1,6 @@
 """Notifier 的 outbox 實作（POC）。正式版可換 PagerDuty / LINE / Slack。"""
-import json, time
+import json
+import time
 
 
 class OutboxNotifier:

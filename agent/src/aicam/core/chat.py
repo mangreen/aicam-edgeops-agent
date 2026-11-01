@@ -1,4 +1,5 @@
 import json
+
 from aicam.core.constants import CHAT_TOOLS
 from aicam.plugins.tools import Call, execute
 

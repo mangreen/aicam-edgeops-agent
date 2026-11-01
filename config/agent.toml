@@ -1,0 +1,19 @@
+# aicam-edgeopt-agent 主設定。修改後可由 UI「能力」面板或 POST /api/admin/reload 熱重載（P2 起）。
+# 機密（API key）只放環境變數 / .env，不要寫在這裡。
+
+[runtime]
+verify_wait = 7          # 動作後等待幾秒再重查指標
+operator_timeout = 30    # demo 縮短；正式環境應為分鐘級
+detect_samples = 3       # 連續幾筆樣本異常才建立 issue
+lanes = [1, 2]
+
+[detector]
+window_sec = 20
+min_detections = 4
+suspect_window_sec = 900
+drop_ratio = 0.5
+healthy_min_samples = 2
+
+[policy]
+l1_max_per_10min = 2     # L1 動作頻率上限（防重啟風暴）
+rate_window_sec = 600

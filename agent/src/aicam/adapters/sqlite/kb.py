@@ -1,5 +1,4 @@
 """KnowledgePort 的 FTS5 實作（POC）。正式版可換向量庫 + bge-m3。"""
-import json, time
 
 
 class FtsKnowledge:

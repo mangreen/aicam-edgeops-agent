@@ -1,7 +1,11 @@
 """雲端 LLM adapters：OpenAI-compatible（含 OpenRouter）與 Anthropic。"""
-import json, re
+import json
+import re
+
 import httpx
+
 from aicam.core.constants import CHAT_TOOLS, PLAN_TOOLS
+
 from .mock import MockLLM
 
 

@@ -1,6 +1,8 @@
 """POC 專用：預先 seed 7 天歷史資料（版本史 v1~v6、metrics、incident logs、issues、對話）。"""
-import json, math, time
+import math
+import time
 from pathlib import Path
+
 from aicam.core import versions as V
 
 DAY, H = 86400, 3600

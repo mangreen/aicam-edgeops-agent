@@ -1,5 +1,7 @@
 """VersionStore 的 SQLite 實作（POC）。正式版可換 Git / S3 / 設定中心。"""
-import json, time
+import json
+import time
+
 from aicam.core import versions as V
 
 

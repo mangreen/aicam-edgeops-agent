@@ -1,8 +1,7 @@
 """Runtime = 所有 port 的實例集合（composition root 的產物）。核心邏輯只透過它取用依賴。"""
 from dataclasses import dataclass
 
-from aicam.adapters.sqlite import (DB, FtsKnowledge, OutboxNotifier, SqliteIssues, SqliteObs,
-                                   SqliteVersions)
+from aicam.adapters.sqlite import DB, FtsKnowledge, OutboxNotifier, SqliteIssues, SqliteObs, SqliteVersions
 from aicam.config import Settings
 
 

@@ -1,12 +1,15 @@
-import sys, time
+import sys
+import time
 from pathlib import Path
+
 import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "agent" / "src"))
-from aicam.poc import seed
-from aicam.config import Settings
-from aicam.runtime import build
 from aicam.adapters.llm import AutoLLM
+from aicam.config import Settings
 from aicam.core.loop import Agent
+from aicam.poc import seed
+from aicam.runtime import build
 
 
 def emit(d, lane, fps=15.0, conn=1.0, det=14.0, n=3):
@@ -56,6 +59,7 @@ def d():
 def client(d):
     """HTTP 層測試：不啟動背景 loop，直接用 TestClient 呼叫 API。"""
     from fastapi.testclient import TestClient
+
     from aicam.api.app import create_app
     from aicam.core.loop import Agent
     return TestClient(create_app(rt=d, agent=Agent(d), background=False))

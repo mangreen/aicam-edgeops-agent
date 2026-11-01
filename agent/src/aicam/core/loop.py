@@ -1,5 +1,8 @@
 """Agent loop：Detect → Triage → Plan → Policy Gate → Execute → Verify → Report / 升級。"""
-import asyncio, json, time
+import asyncio
+import json
+import time
+
 from aicam.core import versions as V
 from aicam.core.constants import HINT, KIND_ZH
 from aicam.plugins.tools import Call, execute

@@ -1,5 +1,6 @@
 """IssueStore 的 SQLite 實作（POC）：issue、事件、action、升級、對話。正式版可換 Postgres。"""
-import json, time
+import json
+import time
 
 
 class SqliteIssues:

@@ -1,6 +1,7 @@
 """POC 專用：決定性規則 + 模板的 Mock LLM。不屬於正式執行路徑。"""
 import re
-from aicam.core.constants import KIND_ZH, CAUSE
+
+from aicam.core.constants import CAUSE, KIND_ZH
 
 
 class MockLLM:
