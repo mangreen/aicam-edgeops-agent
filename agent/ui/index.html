@@ -25,14 +25,15 @@ input{flex:1;background:var(--bg);color:var(--t);border:1px solid var(--b);borde
 </style></head><body>
 <header><h1>🍓 aicam-edgeopt-agent <span class="badge">POC</span></h1>
 <span class="badge" id="llm">LLM: -</span><span class="badge" id="head">config v-</span>
-<button onclick="fault('inference_stalled')">A 推論卡死</button><button onclick="fault('camera_no_signal')">B 攝影機斷訊</button><button onclick="fault('bad_config')">E 壞設定</button>
-<button class="dng" onclick="reset()">Reset</button></header>
+<span id="demo-btns"><button onclick="fault('inference_stalled')">A 推論卡死</button><button onclick="fault('camera_no_signal')">B 攝影機斷訊</button><button onclick="fault('bad_config')">E 壞設定</button>
+<button class="dng" onclick="reset()">Reset</button></span></header>
 <main>
 <div class="col">
  <div class="card"><h2>① 系統狀態</h2><div id="lanes"></div></div>
- <div class="card grow"><div class="tabs"><button id="t-chat" class="on" onclick="tab('chat')">💬 對話查詢</button><button id="t-ver" onclick="tab('ver')">🗂 版本</button></div>
+ <div class="card grow"><div class="tabs"><button id="t-chat" class="on" onclick="tab('chat')">💬 對話查詢</button><button id="t-ver" onclick="tab('ver')">🗂 版本</button><button id="t-cap" onclick="tab('cap')">⚙ 能力</button></div>
   <div id="chat" class="grow chat"></div>
   <div id="ver" class="grow" style="display:none"></div>
+  <div id="cap" class="grow" style="display:none"></div>
   <div class="row" id="chatbar"><input id="q" placeholder="例如：Lane 1 過去 7 天斷線幾次？" onkeydown="if(event.key==='Enter')send()"><button class="pri" onclick="send()">送出</button></div>
  </div>
 </div>
@@ -45,15 +46,23 @@ input{flex:1;background:var(--bg);color:var(--t);border:1px solid var(--b);borde
 const $=id=>document.getElementById(id),J=(u,o)=>fetch(u,o).then(r=>r.json()),P=(u,b)=>J(u,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(b||{})});
 const T=t=>new Date(t*1000).toLocaleTimeString('zh-TW',{hour12:false});
 const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-let last=0,es;
+let last=0,es,F={chat:true};
 function addEv(e){last=Math.max(last,e.id);const d=document.createElement('div');d.className='ev '+e.type;
  d.innerHTML=`<small>${T(e.ts)}${e.issue_id?' #'+e.issue_id:''} ${e.type}</small>${esc(e.text)}`;const tl=$('tl');tl.appendChild(d);tl.scrollTop=tl.scrollHeight;
  if(e.type==='version'||e.type==='operator')loadVer();}
-async function boot(){$('tl').innerHTML='';last=0;(await J('/api/events?limit=60')).forEach(addEv);if(es)es.close();es=new EventSource('/api/stream?after='+last);es.onmessage=m=>addEv(JSON.parse(m.data));
+async function loadFeatures(){F=await J('/api/features');$('demo-btns').style.display=F.demo_controls?'':'none';$('t-chat').style.display=F.chat?'':'none';if(!F.chat)tab('ver')}
+async function loadCap(){const c=await J('/api/capabilities');const lv={L0:'#5b6c7a',L1:'#0f8b8d',L2:'#f2a541',L3:'#e4572e'};
+ $('cap').innerHTML=(F.admin_reload?`<div class="row"><button class="pri" onclick="reloadCfg()">重載設定檔</button><span class="badge">${esc(c.config_path||'預設')}</span></div>`:'')+
+ '<h2 style="margin:10px 0 4px;font-size:13px;color:var(--m)">Tools</h2>'+c.tools.map(t=>`<div class="ver" style="cursor:default;opacity:${t.enabled?1:.5}"><span class="badge" style="background:${lv[t.level]};color:#fff">${t.level}</span> <b>${t.name}</b> <span class="a">${t.source}${t.plannable?' · Agent':''}${t.chat?' · 對話':''}</span>${F.tool_toggle?`<button style="float:right" onclick="toggleTool('${t.name}',${!t.enabled})">${t.enabled?'停用':'啟用'}</button>`:''}<div class="a">${t.enabled?'':'已停用 · '}${esc(t.reason)}</div></div>`).join('')+
+ '<h2 style="margin:10px 0 4px;font-size:13px;color:var(--m)">Skills</h2>'+(c.skills.map(k=>`<div class="ver" style="cursor:default"><span class="dot ${k.active?'':'bad'}"></span><b>${k.name}</b> <span class="a">${esc(k.reason)}</span><div class="a">${esc(k.description)}</div></div>`).join('')||'<div class="empty">無</div>')+
+ '<h2 style="margin:10px 0 4px;font-size:13px;color:var(--m)">功能開關 / 知識來源</h2><div class="a">'+Object.entries(F).map(([k,v])=>`${v?'✅':'⛔'} ${k}`).join('　')+'<br>RAG sources: '+esc(JSON.stringify(c.knowledge_sources))+'</div>'}
+async function toggleTool(n,e){await fetch('/api/admin/tools/'+n,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({enabled:e})});loadCap()}
+async function reloadCfg(){const r=await fetch('/api/admin/reload',{method:'POST'});if(!r.ok)alert((await r.json()).detail);loadCap()}
+async function boot(){await loadFeatures();$('tl').innerHTML='';last=0;(await J('/api/events?limit=60')).forEach(addEv);if(es)es.close();es=new EventSource('/api/stream?after='+last);es.onmessage=m=>addEv(JSON.parse(m.data));
  const h=await J('/api/chat/history');$('chat').innerHTML='';h.forEach(m=>addMsg(m.role,m.content));loadVer();}
 function addMsg(r,t,sub){const d=document.createElement('div');d.className='msg '+r;d.innerHTML=(sub?`<small>${esc(sub)}</small>`:'')+esc(t);$('chat').appendChild(d);$('chat').scrollTop=1e9}
 async function send(){const t=$('q').value.trim();if(!t)return;$('q').value='';addMsg('user',t);const r=await P('/api/chat',{text:t});addMsg('assistant',r.answer,'tools: '+r.tools.join(' → ')+' · '+r.llm);}
-function tab(n){['chat','ver'].forEach(x=>{$(x).style.display=x===n?'block':'none';$('t-'+x).className=x===n?'on':''});$('chatbar').style.display=n==='chat'?'flex':'none'}
+function tab(n){if(n==='cap')loadCap();['chat','ver','cap'].forEach(x=>{$(x).style.display=x===n?'block':'none';$('t-'+x).className=x===n?'on':''});$('chatbar').style.display=n==='chat'&&F.chat?'flex':'none'}
 async function loadVer(){const v=await J('/api/versions');$('ver').innerHTML=v.map((x,i)=>`<div class="ver" onclick="showDiff(${x.seq},${x.parent_seq||0})"><b>v${x.seq}</b> ${i===0?'<span class="badge">HEAD</span>':''} <span class="a">${x.actor} · ${T(x.ts)}</span><br>${esc(x.reason)}<div class="row"><button onclick="event.stopPropagation();rb(${x.seq})">rollback 到此版</button></div></div>`).join('')+'<pre id="diff" class="ev"></pre>'}
 async function showDiff(b,a){if(!a)return;const r=await J(`/api/versions/diff?a=${a}&b=${b}`);$('diff').textContent=r.summary}
 async function rb(s){await P('/api/versions/rollback',{to_seq:s})}

@@ -17,3 +17,33 @@ healthy_min_samples = 2
 [policy]
 l1_max_per_10min = 2     # L1 動作頻率上限（防重啟風暴）
 rate_window_sec = 600
+
+# ── 超出 Operator 權限的功能開關（POC 不做 RBAC：使用者固定為 Operator）──
+# 關閉的功能，API 回 403、UI 隱藏對應控制。
+[features]
+chat = true             # 對話查詢
+tool_toggle = true      # 能力面板可在執行期啟停工具
+admin_reload = true     # 熱重載本設定檔
+demo_controls = true    # UI 的故障注入與 Reset（正式環境請關閉）
+
+# ── 工具開關：每個 tool 一行；未列出的內建工具依 default_enabled ──
+[tools]
+default_enabled = true
+# restart_pipeline = false     # 例：客戶不允許 Agent 重啟 pipeline，就改 false 後重載
+
+# ── 其他工具來源（預設空）──
+[tool_sources]
+python = []                    # 例：["acme_tools.plugin"]（模組需提供 TOOLS，並於 [tools] 明確啟用）
+# MCP 只有介面（McpSourcePort），POC 無內建 adapter；設定未安裝的 adapter 會在啟動時報錯：
+# [tool_sources.mcp.example]
+# adapter = "example-http"
+# [tool_sources.mcp.example.levels]   # 沒宣告等級的 MCP tool 一律視為 L3
+# create_ticket = "L1"
+
+# ── RAG 來源（FTS5 kind）──
+[knowledge]
+sources = ["runbook", "issue"]
+
+# ── Skills：config/skills/<name>/SKILL.md，需要的工具被停用時自動失效 ──
+[skills]
+enabled = ["camera-troubleshoot", "config-rollback"]
