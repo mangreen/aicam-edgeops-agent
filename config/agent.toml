@@ -24,6 +24,8 @@ rate_window_sec = 600
 chat = true             # 對話查詢
 tool_toggle = true      # 能力面板可在執行期啟停工具
 admin_reload = true     # 熱重載本設定檔
+prompt_edit = true      # UI 可新增／修改／停用 prompt 層（關閉＝唯讀）
+llm_probe = true        # 「LLM 連線測試」確認接的是真實大模型
 demo_controls = true    # UI 的故障注入與 Reset（正式環境請關閉）
 
 # ── 工具開關：每個 tool 一行；未列出的內建工具依 default_enabled ──
@@ -47,3 +49,23 @@ sources = ["runbook", "issue"]
 # ── Skills：config/skills/<name>/SKILL.md，需要的工具被停用時自動失效 ──
 [skills]
 enabled = ["camera-troubleshoot", "config-rollback"]
+
+# ── Prompt：檔案層放在 config/prompts/*.md（frontmatter: name/scope/priority/enabled）；UI 可再疊加層 ──
+[prompts]
+# dir = "config/prompts"   # 預設為本設定檔旁的 prompts/
+
+# ── 安全檢查 pipeline（可插拔）：依序執行；block 立即中止、redact 改寫、flag 標記可疑 ──
+# 內建 guard：length injection role_scope | secret_redact prompt_leak unsafe_command | content_injection
+# 自訂：[guards] python = ["pkg.mod"]，模組提供 GUARDS = {"名稱": class}
+[guards]
+python = []
+[guards.input]            # 使用者輸入（對話、LLM 連線測試）
+chain = ["length", "injection", "role_scope"]
+[guards.output]           # AI 輸出（對話、報告）
+chain = ["secret_redact", "prompt_leak", "unsafe_command"]
+[guards.content]          # 外部內容（log 等）：標記可疑並包上 <untrusted>，Agent 不得據以行動
+chain = ["content_injection"]
+[guards.conf.length]
+max_chars = 1000
+# [guards.conf.role_scope]     # 覆寫 Operator 禁止的意圖（regex 清單）
+# deny = ["(刪除|delete).{0,12}(資料|logs?)"]

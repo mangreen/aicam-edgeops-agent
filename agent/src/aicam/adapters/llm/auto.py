@@ -22,6 +22,17 @@ class AutoLLM:
         self.name = "mock"
         return await getattr(self.mock, fn)(*a)
 
+    def set_prompt_source(self, fn):
+        self.mock.set_prompt_source(fn)
+        if self.cloud:
+            self.cloud.set_prompt_source(fn)
+
+    def info(self):
+        """最近一次實際回應者；尚未呼叫前以設定的 provider 為準。"""
+        return (self.cloud.info() if self.cloud and self.name != "mock" else self.mock.info()) | {"fallback_active": bool(self.cloud) and self.name == "mock"}
+
+    async def converse(self, text): return await self._run("converse", text)
+
     async def plan(self, ctx): return await self._run("plan", ctx)
     async def report(self, ctx): return await self._run("report", ctx)
     async def chat_plan(self, t, h, a=None): return await self._run("chat_plan", t, h, a)

@@ -51,6 +51,8 @@ class MockLLM:
             return [{"tool": "query_logs", "args": {"lane": lane, "contains": "stream disconnected", "since_hours": hours or 168}}]
         if re.search(r"改了什麼|誰改|版本|version", t):
             return [{"tool": "list_versions", "args": {"limit": 5}}]
+        if re.search(r"\blogs?\b|日誌", t):
+            return [{"tool": "query_logs", "args": {"lane": lane, "since_hours": hours or 1, "limit": 5}}]
         if re.search(r"trace|追蹤|span", t):
             return [{"tool": "query_traces", "args": {"lane": lane, "status": "error", "since_hours": hours or 1}}]
         if re.search(r"fps|metric|指標|偵測數", t):
@@ -59,6 +61,17 @@ class MockLLM:
         if re.search(r"狀態|status|現在", t):
             return [{"tool": "get_status", "args": {}}]
         return [{"tool": "search_knowledge", "args": {"query": text}}]
+
+    prompt_source = None
+    model = "rule-based"
+
+    def set_prompt_source(self, fn): self.prompt_source = fn
+
+    def info(self): return {"provider": "mock", "model": self.model, "real": False}
+
+    async def converse(self, text):
+        return ("[MOCK] 這是離線 Mock（決定性規則 + 模板），不是真實大模型，也不會解讀 prompt；"
+                "安全底線由程式碼 guard 與 Policy Gate 強制。")
 
     async def chat_answer(self, text, results):
         return "\n".join(f"• {r.get('summary', '')}" for r in results) or "找不到相關資料。"

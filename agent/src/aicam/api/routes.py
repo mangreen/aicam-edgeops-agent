@@ -1,6 +1,7 @@
 """HTTP 路由。依賴由 app factory 放進 app.state（rt、agent），不使用全域變數。"""
 import asyncio
 import json
+import re
 import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -10,7 +11,7 @@ from aicam.core import chat
 from aicam.core.executor import Call, execute
 from aicam.plugins.registry import ConfigError
 
-from .schemas import ChatBody, IngestBody, RespondBody, RollbackBody, ToggleBody
+from .schemas import ChatBody, IngestBody, ProbeBody, PromptBody, RespondBody, RollbackBody, ToggleBody
 
 router = APIRouter()
 
@@ -48,7 +49,7 @@ def ingest(body: IngestBody, request: Request):
 async def status(request: Request):
     d = rt(request)
     r = await execute(d, "get_status")
-    return {"lanes": r["lanes"], "head": d.versions.head()["seq"], "llm": d.llm.name,
+    return {"lanes": r["lanes"], "head": d.versions.head()["seq"], "llm": d.llm.name, "llm_info": d.llm.info(),
             "open_issues": d.issues.list(5, open_only=True), "tools": len(d.tools)}
 
 
@@ -214,3 +215,75 @@ def toggle_tool(name: str, body: ToggleBody, request: Request):
     d.rebuild_plugins()
     d.issues.event(None, "config", f"工具 {name} 於執行期{'啟用' if body.enabled else '停用'}（runtime override）")
     return {"ok": True}
+
+
+_NAME = re.compile(r"^[\w\-]{1,40}$")
+
+
+def _hide_canary(text: str, d) -> str:
+    return text.replace(d.prompts.canary, "****")
+
+
+@router.get("/api/prompts")
+def prompts(request: Request):
+    d = rt(request)
+    return {"layers": d.prompts.layers(), "editable": d.s.feature("prompt_edit")}
+
+
+@router.get("/api/prompts/effective")
+def prompt_effective(request: Request, scope: str = "chat"):
+    d = rt(request)
+    if scope not in ("agent", "chat"):
+        raise HTTPException(422, "scope must be agent|chat")
+    return {"scope": scope, "text": _hide_canary(d.prompts.compose(scope), d)}
+
+
+@router.put("/api/prompts/{name}", dependencies=[feature("prompt_edit")])
+def prompt_put(name: str, body: PromptBody, request: Request):
+    if not _NAME.match(name):
+        raise HTTPException(422, "invalid name")
+    return rt(request).prompts.upsert(name, body.content, body.scope, body.priority, body.enabled)
+
+
+@router.delete("/api/prompts/{name}", dependencies=[feature("prompt_edit")])
+def prompt_delete(name: str, request: Request):
+    return {"ok": rt(request).prompts.delete(name)}
+
+
+@router.get("/api/prompts/{name}/history")
+def prompt_history(name: str, request: Request):
+    return rt(request).prompts.history(name)
+
+
+@router.post("/api/prompts/{name}/revert/{hid}", dependencies=[feature("prompt_edit")])
+def prompt_revert(name: str, hid: int, request: Request):
+    r = rt(request).prompts.revert(name, hid)
+    if not r:
+        raise HTTPException(404, "history entry not found")
+    return r
+
+
+@router.get("/api/guards")
+def guards(request: Request):
+    d = rt(request)
+    ev = d.db.q("SELECT ts, issue_id, text FROM events WHERE type='guard' ORDER BY id DESC LIMIT 15")
+    return {"chains": d.guards.describe(), "recent": ev}
+
+
+@router.post("/api/llm/probe", dependencies=[feature("llm_probe")])
+async def llm_probe(body: ProbeBody, request: Request):
+    """確認接的是真實大模型還是 Mock：同樣經過 input／output guard。"""
+    d = rt(request)
+    gctx = {"system_prompt": d.prompts.compose("chat"), "canary": d.prompts.canary}
+    inp = d.guards.run("input", body.text, gctx)
+    layers = [x["name"] for x in d.prompts.layers() if x["enabled"] and x["scope"] in ("chat", "all")]
+    if inp.blocked:
+        return {"blocked": True, "stage": "input", "answer": inp.text, **d.llm.info(), "layers": layers}
+    t0 = time.time()
+    try:
+        ans = await d.llm.converse(inp.text)
+    except Exception as e:
+        ans = f"（LLM 呼叫失敗：{type(e).__name__}）"
+    out = d.guards.run("output", ans, gctx)
+    return {"blocked": out.blocked, "stage": "output" if out.action != "allow" else None, "answer": out.text,
+            "latency_ms": int((time.time() - t0) * 1000), "layers": layers, **d.llm.info()}

@@ -12,6 +12,17 @@ class LLMError(Exception):
 
 
 class CloudLLM(MockLLM):
+    real = True
+
+    def info(self): return {"provider": self.name, "model": getattr(self, "model", "?"), "real": True}
+
+    def _sys(self, scope, task):
+        base = self.prompt_source(scope) if self.prompt_source else ""
+        return (base + "\n\n" if base else "") + task
+
+    async def converse(self, text):
+        return await self._complete(self._sys("chat", "請簡短回答。"), text)
+
     """雲端 LLM：決策與文字由模型產生；失敗時 raise，由 AutoLLM 退回 Mock。"""
     async def _complete(self, system: str, user: str) -> str: raise NotImplementedError
 
@@ -25,24 +36,24 @@ class CloudLLM(MockLLM):
         plan_tools = list(ctx.get("available_tools", [])) + ["escalate"]
         sys_ = ("你是門市攝影機系統的維運 Agent。只能從 " + ",".join(plan_tools) + " 選一個動作；"
                 "無安全可行動作時選 escalate。僅回 JSON：{\"tool\":..,\"args\":{..},\"rationale\":\"繁中一句\"}")
-        out = self._json(await self._complete(sys_, json.dumps(ctx, ensure_ascii=False, default=str)))
+        out = self._json(await self._complete(self._sys("agent", sys_), json.dumps(ctx, ensure_ascii=False, default=str)))
         if out.get("tool") not in plan_tools: raise LLMError("bad tool")
         return out
 
     async def report(self, ctx):
-        return await self._complete("用繁體中文寫 5 行內事件報告：根因、處置、結果、（如有）變更證據。不要捏造資料中沒有的事實。",
+        return await self._complete(self._sys("agent", "用繁體中文寫 5 行內事件報告：根因、處置、結果、（如有）變更證據。不要捏造資料中沒有的事實。"),
                                     json.dumps(ctx, ensure_ascii=False, default=str))
 
     async def chat_plan(self, text, history, allowed=None):
         allowed = list(allowed or [])
         sys_ = ("你是維運助理。從工具清單選要呼叫的工具，僅回 JSON 陣列 [{\"tool\":..,\"args\":{..}}]，最多 3 個。"
                 "工具：" + ",".join(allowed) + "。rollback 請求用 diff_versions 加 propose_rollback。")
-        calls = self._json(await self._complete(sys_, text))
+        calls = self._json(await self._complete(self._sys("chat", sys_), text))
         if not isinstance(calls, list) or any(c.get("tool") not in allowed for c in calls): raise LLMError("bad calls")
         return calls
 
     async def chat_answer(self, text, results):
-        return await self._complete("依據工具結果用繁體中文簡短回答，不要捏造。",
+        return await self._complete(self._sys("chat", "依據工具結果用繁體中文簡短回答，不要捏造。"),
                                     f"問題：{text}\n結果：{json.dumps(results, ensure_ascii=False, default=str)[:4000]}")
 
 

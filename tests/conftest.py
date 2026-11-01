@@ -5,8 +5,10 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "agent" / "src"))
+from dataclasses import replace
+
 from aicam.adapters.llm import AutoLLM
-from aicam.config import Settings
+from aicam.config import load_settings
 from aicam.core.loop import Agent
 from aicam.poc import seed
 from aicam.runtime import build
@@ -47,8 +49,10 @@ class FakeSim:
 
 @pytest.fixture
 def d():
-    dd = build(Settings(db_path=":memory:", verify_wait=0.05, operator_timeout=1.0))
-    dd.edge, dd.llm = FakeSim(), AutoLLM(None)
+    cfg = Path(__file__).resolve().parent.parent / "config" / "agent.toml"      # 與 demo 相同的真實設定
+    dd = build(replace(load_settings(str(cfg), env={"DB_PATH": ":memory:"}), verify_wait=0.05, operator_timeout=1.0))
+    dd.edge = FakeSim()
+    dd.attach_llm(AutoLLM(None))
     dd.edge.d = dd
     seed.run(dd)
     dd.agent = Agent(dd)

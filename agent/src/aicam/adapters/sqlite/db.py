@@ -15,10 +15,12 @@ CREATE TABLE IF NOT EXISTS escalations(id INTEGER PRIMARY KEY, issue_id INT, to_
 CREATE TABLE IF NOT EXISTS messages(id INTEGER PRIMARY KEY, session TEXT, role TEXT, content TEXT, ts REAL);
 CREATE TABLE IF NOT EXISTS versions(seq INTEGER PRIMARY KEY, parent_seq INT, content_json TEXT, sha256 TEXT, actor TEXT, reason TEXT, issue_id INT, ts REAL);
 CREATE TABLE IF NOT EXISTS outbox(id INTEGER PRIMARY KEY, ts REAL, target TEXT, payload TEXT);
+CREATE TABLE IF NOT EXISTS prompt_layers(name TEXT PRIMARY KEY, scope TEXT, priority INT, enabled INT, content TEXT, updated REAL);
+CREATE TABLE IF NOT EXISTS prompt_history(id INTEGER PRIMARY KEY, name TEXT, scope TEXT, priority INT, enabled INT, content TEXT, ts REAL, note TEXT);
 CREATE VIRTUAL TABLE IF NOT EXISTS kb USING fts5(title, body, kind UNINDEXED, tokenize='trigram');
 """
 TABLES = ["logs", "metrics", "spans", "issues", "events", "actions", "escalations",
-          "messages", "versions", "outbox", "kb"]
+          "messages", "versions", "outbox", "kb", "prompt_layers", "prompt_history"]
 
 
 class DB:

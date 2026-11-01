@@ -49,3 +49,14 @@ class ToggleBody(BaseModel):
 
 class RollbackBody(BaseModel):
     to_seq: int | None = Field(default=None, ge=1)
+
+
+class PromptBody(BaseModel):
+    content: str = Field(min_length=1, max_length=4000)
+    scope: Literal["agent", "chat", "all"] = "all"
+    priority: int = Field(default=50, ge=0, le=1000)
+    enabled: bool = True
+
+
+class ProbeBody(BaseModel):
+    text: str = Field(min_length=1, max_length=500)
