@@ -5,7 +5,7 @@ import time
 
 from aicam.core import versions as V
 from aicam.core.constants import HINT, KIND_ZH
-from aicam.plugins.tools import Call, execute
+from aicam.core.executor import Call, execute
 
 
 class Agent:
@@ -76,7 +76,8 @@ class Agent:
             self.ev(iid, "triage", f"關聯變更：v{suspect['seq']}（{suspect['actor']}）{suspect['diff']}；{suspect['evidence']}")
         history = []
         for _ in range(3):
-            plan = await self._plan(iid, {"kind": kind, "lane": lane, "triage": tri, "suspect": suspect, "history": history})
+            plan = await self._plan(iid, {"kind": kind, "lane": lane, "triage": tri, "suspect": suspect, "history": history,
+                                          "available_tools": d.tools.names(plannable=True)})
             if plan["tool"] == "escalate":
                 self.ev(iid, "plan", f"規劃：升級（{plan.get('rationale', '')}）")
                 break

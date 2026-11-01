@@ -3,20 +3,28 @@ import asyncio
 import json
 import time
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 
 from aicam.core import chat
-from aicam.plugins import tools
-from aicam.plugins.tools import Call
+from aicam.core.executor import Call, execute
+from aicam.plugins.registry import ConfigError
 
-from .schemas import ChatBody, IngestBody, RespondBody, RollbackBody
+from .schemas import ChatBody, IngestBody, RespondBody, RollbackBody, ToggleBody
 
 router = APIRouter()
 
 
 def rt(request: Request):
     return request.app.state.rt
+
+
+def feature(name: str):
+    """功能開關依賴：設定檔 [features] 關閉時回 403（取代 RBAC；POC 使用者固定為 Operator）。"""
+    def dep(request: Request):
+        if not rt(request).s.feature(name):
+            raise HTTPException(403, f"feature disabled: {name}")
+    return Depends(dep)
 
 
 @router.get("/")
@@ -39,14 +47,14 @@ def ingest(body: IngestBody, request: Request):
 @router.get("/api/status")
 async def status(request: Request):
     d = rt(request)
-    r = await tools.execute(d, "get_status")
+    r = await execute(d, "get_status")
     return {"lanes": r["lanes"], "head": d.versions.head()["seq"], "llm": d.llm.name,
-            "open_issues": d.issues.list(5, open_only=True), "tools": len(tools.REG)}
+            "open_issues": d.issues.list(5, open_only=True), "tools": len(d.tools)}
 
 
 @router.get("/api/tools")
-def tool_list():
-    return tools.mcp_tools()
+def tool_list(request: Request):
+    return rt(request).tools.mcp_tools()
 
 
 @router.get("/api/events")
@@ -114,7 +122,7 @@ async def respond(eid: int, body: RespondBody, request: Request):
         return {"ok": True}
     to = json.loads(e["payload"])["to_seq"]
     d.issues.event(e["issue_id"], "operator", f"Operator 確認 rollback 到 v{to}（#{eid}）")
-    r = await tools.execute(d, "rollback_version", {"to_seq": to}, Call(origin="ui", actor="operator", approved=True))
+    r = await execute(d, "rollback_version", {"to_seq": to}, Call(origin="ui", actor="operator", approved=True))
     asyncio.create_task(_post_verify(request))
     return r
 
@@ -126,16 +134,16 @@ def versions(request: Request):
 
 @router.get("/api/versions/diff")
 async def vdiff(request: Request, a: int | None = None, b: int | None = None):
-    return await tools.execute(rt(request), "diff_versions", {"a": a, "b": b} if a and b else {})
+    return await execute(rt(request), "diff_versions", {"a": a, "b": b} if a and b else {})
 
 
 @router.post("/api/versions/rollback")
 async def ui_rollback(body: RollbackBody, request: Request):
-    return await tools.execute(rt(request), "propose_rollback", {"to_seq": body.to_seq},
+    return await execute(rt(request), "propose_rollback", {"to_seq": body.to_seq},
                                Call(origin="ui", actor="operator"))
 
 
-@router.post("/api/chat")
+@router.post("/api/chat", dependencies=[feature("chat")])
 async def chat_(body: ChatBody, request: Request):
     return await chat.handle(rt(request), body.text)
 
@@ -150,16 +158,16 @@ def outbox(request: Request):
     return rt(request).db.q("SELECT * FROM outbox ORDER BY id DESC LIMIT 20")
 
 
-@router.post("/api/demo/fault/{name}")
+@router.post("/api/demo/fault/{name}", dependencies=[feature("demo_controls")])
 async def fault(name: str, request: Request, lane: int = 1):
     d = rt(request)
     if name == "bad_config":   # 情境 E：工程師誤改 ROI，仍走 apply_config（自動快照）
-        return await tools.execute(d, "apply_config", {"patch": {"lanes": {str(lane): {"roi": [120, 200, 60, 40]}}},
+        return await execute(d, "apply_config", {"patch": {"lanes": {str(lane): {"roi": [120, 200, 60, 40]}}},
                                    "reason": f"調整 Lane {lane} ROI（誤設）"}, Call(actor="engineer", origin="external"))
     return await d.edge.fault(name, lane)
 
 
-@router.post("/api/demo/reset")
+@router.post("/api/demo/reset", dependencies=[feature("demo_controls")])
 async def reset(request: Request):
     from aicam.poc import seed
     d, agent = rt(request), request.app.state.agent
@@ -168,4 +176,41 @@ async def reset(request: Request):
     seed.run(d, force=True)
     await d.edge.reset()
     await d.edge.push_config(d.versions.head()["content"])
+    return {"ok": True}
+
+
+@router.get("/api/features")
+def features(request: Request):
+    from aicam.config import FEATURE_DEFAULTS
+    return {k: rt(request).s.feature(k) for k in FEATURE_DEFAULTS}
+
+
+@router.get("/api/capabilities")
+def capabilities(request: Request):
+    d = rt(request)
+    return {"tools": d.tools.describe(), "config_path": d.s.config_path,
+            "skills": [{"name": k.name, "description": k.description, "tools": list(k.tools), "enabled": k.enabled,
+                        "active": k.active, "reason": k.reason} for k in d.skills],
+            "knowledge_sources": d.s.section("knowledge").get("sources", "all")}
+
+
+@router.post("/api/admin/reload", dependencies=[feature("admin_reload")])
+def reload_config(request: Request):
+    d = rt(request)
+    try:
+        d.reload()
+    except (ConfigError, OSError, ValueError) as e:
+        raise HTTPException(400, f"設定載入失敗，維持原設定：{e}") from e
+    d.issues.event(None, "config", "已重新載入設定檔（runtime override 已清除）")
+    return {"ok": True, "tools": len(d.tools)}
+
+
+@router.put("/api/admin/tools/{name}", dependencies=[feature("tool_toggle")])
+def toggle_tool(name: str, body: ToggleBody, request: Request):
+    d = rt(request)
+    if name not in d.tools.specs:
+        raise HTTPException(404, "unknown tool")
+    d.overrides[name] = body.enabled
+    d.rebuild_plugins()
+    d.issues.event(None, "config", f"工具 {name} 於執行期{'啟用' if body.enabled else '停用'}（runtime override）")
     return {"ok": True}

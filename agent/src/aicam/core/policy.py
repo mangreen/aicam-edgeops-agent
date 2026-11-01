@@ -1,11 +1,7 @@
 """Policy gate：純程式碼規則，不交給 LLM。"""
 from dataclasses import dataclass
+from fnmatch import fnmatch
 
-L0 = {"get_status", "query_logs", "query_metrics", "query_traces", "search_knowledge", "search_issues",
-      "search_history", "list_versions", "get_version", "diff_versions", "propose_rollback"}
-L1 = {"restart_pipeline", "reconnect_stream", "apply_config"}
-L2 = {"reboot_device", "rollback_version"}      # rollback 依情境於下方動態判定
-L3 = {"firmware_update", "ssh_exec", "replace_model"}
 RATE_WINDOW = 600  # 預設值；實際由 ctx["rate_window"] 提供（設定檔）
 
 
@@ -17,26 +13,42 @@ class Decision:
 
 
 def evaluate(tool: str, args: dict, ctx: dict) -> Decision:
-    if tool in L0:
-        return Decision("L0", "allow", "唯讀")
-    if tool in L3:
-        return Decision("L3", "escalate_engineer", "不可逆或未知風險，僅產 incident bundle")
+    """風險等級來自 tool manifest（ctx["level"]）；沒有合法等級一律拒絕。"""
+    level = ctx.get("level")
+    if level not in ("L0", "L1", "L2", "L3"):
+        return Decision("L3", "deny", "未宣告風險等級，預設拒絕")
     if tool == "rollback_version":
         return _rollback(args, ctx)
-    if tool in L2:
+    if tool == "apply_config":
+        d = _apply_config(ctx)
+        if d:
+            return d
+    if level == "L0":
+        return Decision("L0", "allow", "唯讀")
+    if level == "L3":
+        return Decision("L3", "escalate_engineer", "不可逆或未知風險，僅產 incident bundle")
+    if level == "L2":
         ok = ctx.get("approved")
         return Decision("L2", "allow" if ok else "needs_operator", "Operator 已核准" if ok else "影響營運，需 Operator 核准")
-    if tool in L1:
-        if tool == "apply_config" and ctx.get("actor") in ("operator", "engineer"):
-            return Decision("L1", "allow", f"{ctx['actor']} 變更，僅記錄來源並自動快照")
-        lane = args.get("lane")
-        n = sum(1 for a in ctx.get("recent", [])
-                if a["tool"] == tool and a.get("lane") == lane and ctx["now"] - a["ts"] < ctx.get("rate_window", RATE_WINDOW))
-        mx = ctx.get("l1_max", 2)
-        if n >= mx:
-            return Decision("L1", "deny", f"超過 L1 頻率限制（{mx} 次/10 分鐘），防止重啟風暴")
-        return Decision("L1", "allow", f"可逆低風險（本窗口已 {n}/{mx} 次）")
-    return Decision("L3", "deny", f"未知工具 {tool}")
+    lane = args.get("lane")
+    n = sum(1 for a in ctx.get("recent", [])
+            if a["tool"] == tool and a.get("lane") == lane and ctx["now"] - a["ts"] < ctx.get("rate_window", RATE_WINDOW))
+    mx = ctx.get("l1_max", 2)
+    if n >= mx:
+        return Decision("L1", "deny", f"超過 L1 頻率限制（{mx} 次/10 分鐘），防止重啟風暴")
+    return Decision("L1", "allow", f"可逆低風險（本窗口已 {n}/{mx} 次）")
+
+
+def _apply_config(ctx):
+    """Operator／工程師的變更只記錄來源；Agent 只能改白名單路徑。"""
+    if ctx.get("actor") in ("operator", "engineer"):
+        return Decision("L1", "allow", f"{ctx['actor']} 變更，僅記錄來源並自動快照")
+    if ctx.get("approved"):
+        return Decision("L1", "allow", "Operator 已核准")
+    bad = [k for k in ctx.get("patch_keys", []) if not any(fnmatch(k, p) for p in ctx.get("agent_writable", ()))]
+    if bad:
+        return Decision("L2", "needs_operator", f"Agent 不可自行修改 {bad[:3]}（不在白名單），需 Operator 確認")
+    return None
 
 
 def _rollback(args, ctx):

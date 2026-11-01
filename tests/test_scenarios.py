@@ -1,7 +1,7 @@
 import asyncio
 
 from aicam.core import chat
-from aicam.plugins.tools import Call, execute
+from aicam.core.executor import Call, execute
 from conftest import emit
 
 
