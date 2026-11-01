@@ -1,33 +1,25 @@
-import os
-from dataclasses import dataclass, field
-from aicam.adapters import sqlite as A
-from aicam.adapters.sqlite import DB
+"""Runtime = 所有 port 的實例集合（composition root 的產物）。核心邏輯只透過它取用依賴。"""
+from dataclasses import dataclass
+
+from aicam.adapters.sqlite import (DB, FtsKnowledge, OutboxNotifier, SqliteIssues, SqliteObs,
+                                   SqliteVersions)
+from aicam.config import Settings
 
 
 @dataclass
-class Settings:
-    db_path: str = os.getenv("DB_PATH", "/data/agent.db")
-    sim_url: str = os.getenv("SIM_URL", "http://sim:8001")
-    verify_wait: float = float(os.getenv("VERIFY_WAIT", "7"))
-    operator_timeout: float = float(os.getenv("OPERATOR_TIMEOUT", "30"))
-    detect_samples: int = 3
-    lanes: tuple = (1, 2)
-
-
-@dataclass
-class Deps:
+class Runtime:
     s: Settings
     db: DB
-    obs: A.SqliteObs
-    issues: A.SqliteIssues
-    versions: A.SqliteVersions
-    kb: A.FtsKnowledge
-    notifier: A.OutboxNotifier
-    sim: object = None
-    llm: object = None
+    obs: SqliteObs
+    issues: SqliteIssues
+    versions: SqliteVersions
+    kb: FtsKnowledge
+    notifier: OutboxNotifier
+    edge: object = None   # EdgeControlPort
+    llm: object = None    # LLMProvider
 
 
-def build(settings: Settings, sim=None, llm=None) -> Deps:
+def build(settings: Settings, edge=None, llm=None) -> Runtime:
     db = DB(settings.db_path)
-    return Deps(settings, db, A.SqliteObs(db), A.SqliteIssues(db), A.SqliteVersions(db),
-                A.FtsKnowledge(db), A.OutboxNotifier(db), sim, llm)
+    return Runtime(settings, db, SqliteObs(db), SqliteIssues(db), SqliteVersions(db),
+                   FtsKnowledge(db), OutboxNotifier(db), edge, llm)

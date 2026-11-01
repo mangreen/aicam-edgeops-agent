@@ -3,7 +3,8 @@ from pathlib import Path
 import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "agent" / "src"))
 from aicam.poc import seed
-from aicam.runtime import Settings, build
+from aicam.config import Settings
+from aicam.runtime import build
 from aicam.adapters.llm import AutoLLM
 from aicam.core.loop import Agent
 
@@ -29,6 +30,12 @@ class FakeSim:
     async def physical_fix(self, lane):
         self.camera_down.discard(lane); emit(self.d, lane); return {"ok": True}
 
+    async def fault(self, name, lane=1):
+        self.calls.append(("fault", name, lane)); return {"ok": True}
+
+    async def reset(self):
+        self.camera_down.clear(); return {"ok": True}
+
     async def push_config(self, cfg):
         for ln, c in cfg["lanes"].items():
             emit(self.d, int(ln), det=0.3 if c["roi"][2] * c["roi"][3] < 10000 else 14.0)
@@ -38,8 +45,17 @@ class FakeSim:
 @pytest.fixture
 def d():
     dd = build(Settings(db_path=":memory:", verify_wait=0.05, operator_timeout=1.0))
-    dd.sim, dd.llm = FakeSim(), AutoLLM(None)
-    dd.sim.d = dd
+    dd.edge, dd.llm = FakeSim(), AutoLLM(None)
+    dd.edge.d = dd
     seed.run(dd)
     dd.agent = Agent(dd)
     return dd
+
+
+@pytest.fixture
+def client(d):
+    """HTTP 層測試：不啟動背景 loop，直接用 TestClient 呼叫 API。"""
+    from fastapi.testclient import TestClient
+    from aicam.api.app import create_app
+    from aicam.core.loop import Agent
+    return TestClient(create_app(rt=d, agent=Agent(d), background=False))

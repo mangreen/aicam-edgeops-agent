@@ -23,7 +23,7 @@ async def test_A_auto_fix(d):
 
 
 async def test_B_to_C_escalation(d):
-    d.sim.camera_down.add(1)
+    d.edge.camera_down.add(1)
     emit(d, 1, fps=0.0, conn=0.0, det=0.0)
     [t] = await d.agent.tick()
     op = await _pending(d, "operator")
@@ -38,7 +38,7 @@ async def test_B_to_C_escalation(d):
 
 
 async def test_B_operator_fixes(d):
-    d.sim.camera_down.add(1)
+    d.edge.camera_down.add(1)
     emit(d, 1, fps=0.0, conn=0.0, det=0.0)
     [t] = await d.agent.tick()
     d.issues.esc_respond((await _pending(d, "operator"))["id"], "fixed")
@@ -47,7 +47,7 @@ async def test_B_operator_fixes(d):
 
 
 async def test_B_operator_timeout_calls_engineer(d):
-    d.sim.camera_down.add(1)
+    d.edge.camera_down.add(1)
     emit(d, 1, fps=0.0, conn=0.0, det=0.0)
     [t] = await d.agent.tick()
     await _pending(d, "engineer", timeout=5)                   # operator_timeout=1s
