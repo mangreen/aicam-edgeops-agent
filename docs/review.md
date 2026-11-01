@@ -25,3 +25,28 @@
 - 版本快照 append-only、雜湊去重、拒收明文憑證。
 - 回報區分「已執行」與「未執行」；沒有機密入庫。
 - 破壞性操作與外部操作（升級、rollback）都需授權或確認。
+
+## 處理結果（v0.2）
+
+| # | 狀態 | 說明 |
+|---|---|---|
+| 1 | 已處理 | 階段分支 + Conventional Commits；每個 commit 單獨跑過測試 |
+| 2 | 部分（依決策） | 決定不做 RBAC（ADR-003/004）：使用者固定為 Operator，越權功能由 `[features]` 關閉並回 403；**無身分驗證仍是正式化前必補項目** |
+| 3 | 已處理 | pydantic schemas：型別、列舉、長度、批次大小 |
+| 4 | 已處理 | executor 依 inputSchema 驗證參數（缺少／未知／型別錯誤皆拒絕） |
+| 5 | 已處理 | content guard + `<untrusted>` 隔離；input／output guard |
+| 6 | 已處理 | `poc/`、`adapters/llm/mock.py`、`sim/` 明確標示 POC 專用；UI 如實顯示 MOCK |
+| 7 | 已處理 | tool manifest 宣告等級，未宣告即拒絕；policy 不再硬編碼工具名單（rollback／apply_config 的動態規則除外） |
+| 8 | 已處理 | app factory + `Runtime`；移除全域變數與無意義的 dict 合併 |
+| 9 | 已處理 | 門檻移入 `[detector]`／`[policy]` |
+| 10 | 接受 | 同步 SQLite（毫秒級查詢），已於 `DB` 與架構文件註明 |
+| 11 | 已處理 | 測試由 22 增至 108：API 層、seed／reset、sim、偵測優先序、頻率限制端到端、guard red-team、prompt、外掛 |
+| 12 | 已處理 | architecture、config reference、ADR-002/003/004、AGENTS.md、runbook、demo 腳本、todo |
+| 13 | 部分 | 依賴已鎖版、容器 non-root、`mem_limit`／`read_only`；**未在真實 Docker 驗證**（見 `todo.md`） |
+| 14 | 已處理（CI 未驗證） | ruff 通過；GitHub Actions 已建立，尚未在 GitHub 上首次執行 |
+| 15 | 已處理 | 目錄與程式碼註解層級標示 |
+
+### 新發現（開發過程中）
+- `query_logs` 原摘要只含筆數，對查詢不實用且讓 log 內容繞過 guard 流程 → 改為附最近訊息並經 content／output guard。
+- `search_history` 原本會搜到 Agent 自己的工具輸出 → 改為只比對使用者提問並附上對應回答。
+- 開發過程曾因行程未清除而讀到舊程式碼的測試結果；之後以乾淨 worktree 逐 commit 驗證。
