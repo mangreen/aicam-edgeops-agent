@@ -4,6 +4,7 @@ import os
 import random
 import time
 import uuid
+from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI, HTTPException
@@ -16,7 +17,14 @@ DEFAULT_CFG = {"model": "vehicle-det-1.2.0", "policy": {"l1_max_per_10min": 2},
                "lanes": {str(i): {"roi": [120, 200, 640, 300], "fps_threshold": 10,
                                   "rtsp": "${SECRET:cam%d}" % i} for i in LANES}}
 
-app = FastAPI(title="aicam-sim")
+@asynccontextmanager
+async def lifespan(_app):
+    task = asyncio.create_task(loop())
+    yield
+    task.cancel()
+
+
+app = FastAPI(title="aicam-sim", lifespan=lifespan)
 S = {"cfg": DEFAULT_CFG, "buf": {"logs": [], "metrics": [], "spans": []}, "tick": 0,
      "lanes": {i: {"camera": True, "pipeline": True, "retry": 0} for i in LANES}}
 
@@ -37,30 +45,35 @@ def make_spans(lane, st):
              "ts": now, "dur_ms": d, "status": s} for i, (n, d, s) in enumerate(rows)]
 
 
+def tick_once():
+    """產生一個取樣週期的 metrics / spans / logs（寫入緩衝區，不送出）。獨立出來以便測試。"""
+    S["tick"] += 1
+    now = time.time()
+    for lane, st in S["lanes"].items():
+        cfg = S["cfg"]["lanes"][str(lane)]
+        ok = st["camera"] and st["pipeline"]
+        fps = round(random.uniform(14.5, 15.5), 1) if ok else 0.0
+        w, h = cfg["roi"][2], cfg["roi"][3]
+        det = round(max(0.0, 14 * min(1, w * h / BASE_AREA) + random.uniform(-2, 2)), 1) if ok else 0.0
+        for n, v in (("fps", fps), ("stream_connected", 1.0 if st["camera"] else 0.0),
+                     ("detections_per_min", det)):
+            S["buf"]["metrics"].append({"ts": now, "lane": lane, "name": n, "value": v})
+        S["buf"]["spans"] += make_spans(lane, st)
+        if not st["camera"] and S["tick"] % 5 == 0:
+            st["retry"] += 1
+            log(lane, "ERROR", f"still no signal from camera (auto-retry #{st['retry']})")
+        elif st["camera"] and not st["pipeline"] and S["tick"] % 5 == 0:
+            log(lane, "ERROR", "inference worker stalled: queue depth growing, 0 frames processed")
+        elif ok and det < 4 and S["tick"] % 5 == 0:
+            log(lane, "WARN", f"vehicle detections dropped to {det}/min (roi={cfg['roi']})")
+        elif ok and S["tick"] % 15 == 0:
+            log(lane, "INFO", f"frame batch ok fps={fps} det={det}/min")
+
+
 async def loop():
     while True:
         await asyncio.sleep(TICK)
-        S["tick"] += 1
-        now = time.time()
-        for lane, st in S["lanes"].items():
-            cfg = S["cfg"]["lanes"][str(lane)]
-            ok = st["camera"] and st["pipeline"]
-            fps = round(random.uniform(14.5, 15.5), 1) if ok else 0.0
-            w, h = cfg["roi"][2], cfg["roi"][3]
-            det = round(max(0.0, 14 * min(1, w * h / BASE_AREA) + random.uniform(-2, 2)), 1) if ok else 0.0
-            for n, v in (("fps", fps), ("stream_connected", 1.0 if st["camera"] else 0.0),
-                         ("detections_per_min", det)):
-                S["buf"]["metrics"].append({"ts": now, "lane": lane, "name": n, "value": v})
-            S["buf"]["spans"] += make_spans(lane, st)
-            if not st["camera"] and S["tick"] % 5 == 0:
-                st["retry"] += 1
-                log(lane, "ERROR", f"still no signal from camera (auto-retry #{st['retry']})")
-            elif st["camera"] and not st["pipeline"] and S["tick"] % 5 == 0:
-                log(lane, "ERROR", "inference worker stalled: queue depth growing, 0 frames processed")
-            elif ok and det < 4 and S["tick"] % 5 == 0:
-                log(lane, "WARN", f"vehicle detections dropped to {det}/min (roi={cfg['roi']})")
-            elif ok and S["tick"] % 15 == 0:
-                log(lane, "INFO", f"frame batch ok fps={fps} det={det}/min")
+        tick_once()
         await flush()
 
 
@@ -71,11 +84,6 @@ async def flush():
             await c.post(f"{AGENT_URL}/ingest", json=buf)
     except Exception:
         pass  # agent 尚未就緒或重啟中：丟棄本批資料（POC 可接受）
-
-
-@app.on_event("startup")
-async def _start():
-    asyncio.create_task(loop())
 
 
 def _lane(lane: int):
