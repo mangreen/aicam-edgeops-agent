@@ -18,7 +18,7 @@ class Skill:
     reason: str = ""
 
 
-def _parse(text: str) -> tuple[dict, str]:
+def parse_frontmatter(text: str) -> tuple[dict, str]:
     meta, body = {}, text
     if text.startswith("---"):
         _, head, body = text.split("---", 2)
@@ -37,7 +37,7 @@ def load_skills(settings, registry) -> list[Skill]:
     if not root or not root.is_dir():
         return out
     for p in sorted(root.glob("*/SKILL.md")):
-        meta, body = _parse(p.read_text(encoding="utf-8"))
+        meta, body = parse_frontmatter(p.read_text(encoding="utf-8"))
         name = meta.get("name", p.parent.name)
         tools = tuple(t.strip() for t in meta.get("tools", "").split(",") if t.strip())
         sk = Skill(name, meta.get("description", ""), tools, body, enabled=name in enabled)

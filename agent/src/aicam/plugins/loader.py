@@ -10,7 +10,7 @@ from aicam.ports.mcp import McpSourcePort  # noqa: F401  (型別參考)
 
 from .registry import LEVELS, ConfigError, ToolRegistry, ToolSpec
 
-BUILTIN_MODULES = ["observability", "knowledge", "versions", "remediation", "web"]
+BUILTIN_MODULES = ["observability", "knowledge", "versions", "remediation"]
 
 # MCP adapter 註冊點：{"adapter 名稱": factory(conf: dict) -> McpSourcePort}。
 # POC 沒有內建任何 adapter（只有介面）；設定了未註冊的 adapter 會在啟動時報錯。
@@ -20,13 +20,7 @@ MCP_ADAPTERS: dict = {}
 def _builtin_specs() -> list[ToolSpec]:
     specs = []
     for m in BUILTIN_MODULES:
-        try:
-            mod = importlib.import_module(f"aicam.plugins.builtin.{m}")
-        except ModuleNotFoundError as e:
-            if e.name == f"aicam.plugins.builtin.{m}":
-                continue            # 尚未提供的選用模組
-            raise
-        specs += mod.TOOLS
+        specs += importlib.import_module(f"aicam.plugins.builtin.{m}").TOOLS
     return specs
 
 

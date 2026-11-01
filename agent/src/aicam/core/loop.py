@@ -6,6 +6,7 @@ import time
 from aicam.core import versions as V
 from aicam.core.constants import HINT, KIND_ZH
 from aicam.core.executor import Call, execute
+from aicam.core.untrusted import wrap
 
 
 class Agent:
@@ -66,11 +67,12 @@ class Agent:
         lane, kind, call = issue["lane"], issue["kind"], Call(issue_id=iid)
         d.issues.update(iid, status="triaging")
         self.ev(iid, "triage", "Triage：查 logs / metrics / traces、相似 issue 與 runbook")
-        tri = [(await execute(d, "query_logs", {"lane": lane, "since_hours": 0.1, "limit": 5}, call))["summary"],
+        tri_raw = [(await execute(d, "query_logs", {"lane": lane, "since_hours": 0.1, "limit": 5}, call))["summary"],
                (await execute(d, "query_metrics", {"lane": lane, "name": "fps", "since_hours": 0.1}, call))["summary"],
                (await execute(d, "query_traces", {"lane": lane, "status": "error", "since_hours": 0.1}, call))["summary"],
                (await execute(d, "search_issues", {"kind": kind, "lane": lane}, call))["summary"],
                (await execute(d, "search_knowledge", {"query": kind}, call))["summary"]]
+        tri = [self._untrusted(iid, f"triage-{i}", t)[0] for i, t in enumerate(tri_raw)]
         suspect = self.find_suspect(lane, issue["created"]) if kind == "detection_drop" else None
         if suspect:
             self.ev(iid, "triage", f"關聯變更：v{suspect['seq']}（{suspect['actor']}）{suspect['diff']}；{suspect['evidence']}")
@@ -99,6 +101,11 @@ class Agent:
             if plan["tool"] == "rollback_version":
                 break                                  # Verify 失敗不重複 rollback
         await self._operator(iid)
+
+    def _untrusted(self, iid, source, text):
+        """log／網頁等外部內容：先過 content guard，再包上 <untrusted> 標記才能進入 LLM。"""
+        out = self.d.guards.run("content", text, {"issue_id": iid})
+        return wrap(source, out.text), out.flagged
 
     async def _plan(self, iid, ctx):
         try:
@@ -146,6 +153,8 @@ class Agent:
             report = await d.llm.report(ctx)
         except Exception:
             report = await d.llm.mock.report(ctx)
+        report = d.guards.run("output", report, {"issue_id": iid, "system_prompt": d.prompts.compose("agent"),
+                                                  "canary": d.prompts.canary}).text
         d.issues.update(iid, status="resolved", closed=time.time(), resolved_by=by, summary=outcome)
         self.last_close[issue["lane"]] = time.time()
         self.ev(iid, "report", report)

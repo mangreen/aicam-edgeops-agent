@@ -32,7 +32,7 @@ def create_app(rt=None, agent=None, background: bool = True) -> FastAPI:
         if app.state.rt is None:
             s = load_settings()
             app.state.rt = build(s, edge=SimClient(s.sim_url))
-            app.state.rt.llm = make_llm(lambda m: app.state.rt.issues.event(None, "llm", m))
+            app.state.rt.attach_llm(make_llm(lambda m: app.state.rt.issues.event(None, "llm", m)))
             seed.run(app.state.rt)
             app.state.agent = Agent(app.state.rt)
         tasks = []
