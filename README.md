@@ -1,32 +1,50 @@
 # aicam-edgeopt-agent（POC）
 
-AI 攝影機系統自主維運 Agent：偵測 → Triage → 規劃 → Policy Gate → 執行 → Verify → 報告／升級（Operator → 遠端工程師）；
-支援 logs/metrics/traces、歷史 issue、歷史對話查詢，以及設定版本快照與 rollback。
+地端 AI Agent，自動排除 AI 攝影機系統（得來速計時等）的故障：
+**Agent 自動修復 → Operator 現場協助 → 遠端工程師（附 incident bundle）**；可查詢 logs／metrics／traces／歷史 issue／歷史對話；
+所有設定變更自動快照，可查詢、可 rollback。工具、RAG、Skill、MCP 介面、prompt、安全檢查皆可由設定檔插拔。
 
-> **POC 專用**：`sim/`（模擬邊緣端與故障注入）與 Mock LLM（決定性規則 + 模板）不屬於正式執行路徑。
+> **POC 專用**：`sim/`（邊緣端模擬與故障注入）與 Mock LLM（決定性規則＋模板）不屬於正式執行路徑。離線時使用 Mock；有網路可接 Claude／OpenAI／OpenRouter。
+> 開發環境無法驗證 Docker 與真雲端 LLM，見 [`todo.md`](todo.md)。
 
-## 啟動（只需 Docker + 瀏覽器）
+## 快速開始（Host 只需 Docker Desktop 與瀏覽器）
+```bash
+make up        # 首次需網路 build；自動建立 .env（預設 LLM_PROVIDER=mock，離線可跑）
+open http://localhost:8000
+make test      # 在 Docker 內跑 pytest（不需要 Host Python）
 ```
-cp .env.example .env     # （make up 會自動建立）預設 LLM_PROVIDER=mock（離線）；有網路可改 auto 並填 key
-make up                  # build 並啟動，UI: http://localhost:8000
-make test                # 在 Docker 內跑 22 項 pytest（Host 不需 Python）（policy / 版本 / 場景 A、B→C、E / 聊天）
-```
-Demo 控制：UI 右上按鈕，或 `make fault-A | fault-B | fault-E | reset`。
-離線 demo 前請先在有網路時 `make up` 完成 build，再斷網演練一次。
+有網路想用真模型：編輯 `.env` → `LLM_PROVIDER=auto` 並填一組 API key → `make up`。
+UI 標頭會如實顯示 `REAL · provider/model` 或 `MOCK`。離線攜帶：`make pack` → 離線機 `make load && make up-offline`。
 
-## Demo 劇本（約 4 分 20 秒）
-| 段落 | 操作 | 預期 |
+## 情境
+| | 情境 | 展示 |
 |---|---|---|
-| A 自動修復 | `fault-A` | ~15s：偵測→查詢→restart_pipeline(L1)→Verify→報告 |
-| B→C 升級 | `fault-B` → Operator 面板按「無法處理」 | reconnect 失敗 2 次→請 Operator→遠端工程師收到 bundle→按「工程師已修復」 |
-| D 對話 | 「Lane 1 過去 7 天斷線幾次？」「上次類似問題怎麼解？」「我們之前聊過 Lane 2 的什麼？」「回到上一版」→ Operator 面板確認 | 查 logs/issue/歷史對話；rollback 先顯示 diff 再確認 |
-| E 版本 rollback | `fault-E` | ~13s：偵測數驟降→關聯 v7 變更→rollback 到 v6（L1，附 diff 與證據）→Verify |
+| A | 推論卡死 | Agent 自動：偵測 → 查證 → `restart_pipeline`(L1) → Verify → 報告 |
+| B→C | 攝影機無訊號 | 重連失敗 2 次 → Operator → 無法處理／逾時 → 遠端工程師 bundle |
+| D | 對話查詢 | logs／metrics／traces／歷史 issue／歷史對話／版本；rollback 需 Operator 確認 |
+| E | 壞設定 | 偵測數驟降 → 關聯近期變更 → 附 diff 與證據自動 rollback → Verify |
+| 安全 | prompt 分層、guard、功能開關 | 輸入／輸出／外部內容檢查，越權意圖被擋，設定檔關閉功能 |
 
-> 順序提醒：「回到上一版」的對話示範請在 **E 之前**做（此時上一版 v5 無害）；E 之後的「上一版」是壞設定 v7。
+Demo 逐步操作：[`docs/demo-script.md`](docs/demo-script.md)（5 分鐘版＋完整版）。
 
-## 架構（Port → POC adapter → 正式版）
-LLMProvider: Mock/OpenAI-compat/Anthropic → vLLM/Ollama ｜ ObservabilityPort: SQLite → Loki/Prometheus/Tempo ｜ KnowledgePort: FTS5 → 向量庫 ｜ IssueStore/VersionStore: SQLite → Postgres/Git ｜ Notifier: outbox → PagerDuty/LINE ｜ Tools: 內部 registry（MCP 相容 schema，`GET /api/tools`）
+## 文件
+| | |
+|---|---|
+| [`docs/architecture.md`](docs/architecture.md) | 架構、Agent loop、Policy Gate、版本、安全模型 |
+| [`docs/config-reference.md`](docs/config-reference.md) | `config/agent.toml` 與環境變數 |
+| [`docs/ADR-001…004`](docs/) | 技術選型、Hexagonal＋外掛、安全模型、POC 範圍 |
+| [`docs/runbooks/operations.md`](docs/runbooks/operations.md) | 啟停、離線攜帶、疑難排解、擴充 |
+| [`docs/review.md`](docs/review.md) | 對照開發規範的程式碼審查 |
+| [`AGENTS.md`](AGENTS.md)／[`todo.md`](todo.md) | 給 Agent／開發者的規則與待辦 |
 
-風險等級由程式碼 policy 決定（`agent/app/policy.py`），不交給 LLM：L0 唯讀自動；L1 可逆低風險自動（2 次/10 分鐘、必須 Verify）；L2 需 Operator；L3 只產 incident bundle。
+## 專案結構
+```
+agent/src/aicam/  core（loop·policy·executor·versions·guards）  ports  adapters（sqlite·llm·edge·guards）
+                  plugins（tool registry·loader·skills·builtin）  prompts  api  poc（seed）
+agent/ui/         單頁 UI（vanilla JS + SSE，無 CDN，可離線）      agent/runbooks/  RAG 知識來源
+sim/              POC 邊緣端模擬器                                  config/          agent.toml、prompts、skills
+tests/            pytest（policy／版本／場景／API／guard／prompt／sim）   slides/   簡報
+```
 
-與計畫的差異：`agent/app/` 採扁平模組（ports、adapters、tools、llm、loop…）以求精簡；cooldown 以「頻率限制」取代。
+## 範圍外（見 ADR-004）
+RBAC／SSO（改用 `[features]` 開關）、MCP client 實作（僅介面）、無頭瀏覽器與網路搜尋、向量 RAG、模型訓練、K8s、完整可觀測性堆疊。
