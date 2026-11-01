@@ -11,14 +11,20 @@ class MockLLM:
     async def plan(self, ctx):
         k, lane, h = ctx["kind"], ctx["lane"], ctx["history"]
         fails = [x for x in h if not x["ok"]]
+        avail = ctx.get("available_tools")
+
+        def act(tool, args, why):
+            if avail is not None and tool not in avail:      # 設定檔已停用該工具 → 不提案，直接升級
+                return {"tool": "escalate", "args": {}, "rationale": f"工具 {tool} 已停用（設定檔），無法自動處理"}
+            return {"tool": tool, "args": args, "rationale": why}
         if k == "inference_stalled" and len(fails) < 2:
-            return {"tool": "restart_pipeline", "args": {"lane": lane}, "rationale": "FPS 歸零但串流正常，依 runbook 先重啟 pipeline"}
+            return act("restart_pipeline", {"lane": lane}, "FPS 歸零但串流正常，依 runbook 先重啟 pipeline")
         if k == "camera_no_signal" and len(fails) < 2:
-            return {"tool": "reconnect_stream", "args": {"lane": lane}, "rationale": "串流中斷，依 runbook 先嘗試重連"}
+            return act("reconnect_stream", {"lane": lane}, "串流中斷，依 runbook 先嘗試重連")
         if k == "detection_drop" and ctx.get("suspect") and not h:
             s = ctx["suspect"]
-            return {"tool": "rollback_version", "args": {"to_seq": s["parent_seq"], "evidence": s["evidence"]},
-                    "rationale": f"v{s['seq']}（{s['actor']}）變更後偵測數驟降，建議回到 v{s['parent_seq']}"}
+            return act("rollback_version", {"to_seq": s["parent_seq"], "evidence": s["evidence"]},
+                       f"v{s['seq']}（{s['actor']}）變更後偵測數驟降，建議回到 v{s['parent_seq']}")
         return {"tool": "escalate", "args": {}, "rationale": "自動修復已無可行或安全的動作，升級處理"}
 
     async def report(self, ctx):

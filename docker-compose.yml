@@ -1,5 +1,6 @@
 services:
   sim:
+    image: aicam/sim:0.2
     build: ./sim
     mem_limit: 256m
     read_only: true
@@ -11,6 +12,7 @@ services:
       interval: 5s
       retries: 10
   agent:
+    image: aicam/agent:0.2
     build:
       context: .
       dockerfile: agent/Dockerfile

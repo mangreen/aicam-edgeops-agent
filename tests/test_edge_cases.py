@@ -119,3 +119,18 @@ def test_settings_defaults_are_safe():
     s = Settings()
     assert s.feature("chat") and not s.feature("prompt_edit") and not s.feature("demo_controls")
     assert replace(s, raw={"features": {"prompt_edit": True}}).feature("prompt_edit")
+
+
+async def test_disabled_tool_makes_agent_escalate_instead_of_acting(d, agent):
+    d.s = replace(d.s, raw={**d.s.raw, "tools": {"restart_pipeline": False}})
+    d.rebuild_plugins()
+    emit(d, 1, fps=0.0, det=0.0)
+    [t] = await agent.tick()
+    for _ in range(100):
+        if d.issues.esc_pending():
+            break
+        await _sleep()
+    assert d.issues.esc_pending()[0]["to_who"] == "operator" and d.edge.calls == []
+    txt = " ".join(e["text"] for e in d.issues.events(issue_id=d.issues.list(1)[0]["id"]))
+    assert "已停用" in txt
+    t.cancel()
