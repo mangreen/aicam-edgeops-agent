@@ -21,7 +21,7 @@ main{flex:1;display:grid;grid-template-columns:340px 1fr 380px;gap:10px;padding:
 .esc{border:1px solid #a371f7;border-radius:6px;padding:8px;margin-bottom:8px;background:#1d1830}.esc.eng{border-color:var(--err);background:#2a1618}
 .esc pre{white-space:pre-wrap;font-size:12px;max-height:150px;overflow:auto;margin:6px 0}.row{display:flex;gap:6px;margin-top:6px}
 .chat .msg{margin-bottom:6px;padding:5px 8px;border-radius:6px;white-space:pre-wrap}.chat .user{background:#1f2f45}.chat .assistant{background:#222b36}.chat small{color:var(--m);display:block}
-input{flex:1;background:var(--bg);color:var(--t);border:1px solid var(--b);border-radius:6px;padding:6px 8px}.empty{color:var(--m);font-size:13px}
+input{flex:1;background:var(--bg);color:var(--t);border:1px solid var(--b);border-radius:6px;padding:6px 8px}.empty{color:var(--m);font-size:13px}.chat .blocked{background:#3a1d1d;border:1px solid var(--err)}textarea,select{background:var(--bg);color:var(--t);border:1px solid var(--b);border-radius:6px;padding:6px 8px;font:inherit;width:100%}.real{background:#13301f!important;color:var(--ok)!important}.mock{background:#352a10!important;color:var(--warn)!important}
 </style></head><body>
 <header><h1>🍓 aicam-edgeopt-agent <span class="badge">POC</span></h1>
 <span class="badge" id="llm">LLM: -</span><span class="badge" id="head">config v-</span>
@@ -30,10 +30,11 @@ input{flex:1;background:var(--bg);color:var(--t);border:1px solid var(--b);borde
 <main>
 <div class="col">
  <div class="card"><h2>① 系統狀態</h2><div id="lanes"></div></div>
- <div class="card grow"><div class="tabs"><button id="t-chat" class="on" onclick="tab('chat')">💬 對話查詢</button><button id="t-ver" onclick="tab('ver')">🗂 版本</button><button id="t-cap" onclick="tab('cap')">⚙ 能力</button></div>
+ <div class="card grow"><div class="tabs"><button id="t-chat" class="on" onclick="tab('chat')">💬 對話查詢</button><button id="t-ver" onclick="tab('ver')">🗂 版本</button><button id="t-cap" onclick="tab('cap')">⚙ 能力</button><button id="t-sec" onclick="tab('sec')">🛡 安全</button></div>
   <div id="chat" class="grow chat"></div>
   <div id="ver" class="grow" style="display:none"></div>
   <div id="cap" class="grow" style="display:none"></div>
+  <div id="sec" class="grow" style="display:none"></div>
   <div class="row" id="chatbar"><input id="q" placeholder="例如：Lane 1 過去 7 天斷線幾次？" onkeydown="if(event.key==='Enter')send()"><button class="pri" onclick="send()">送出</button></div>
  </div>
 </div>
@@ -58,11 +59,24 @@ async function loadCap(){const c=await J('/api/capabilities');const lv={L0:'#5b6
  '<h2 style="margin:10px 0 4px;font-size:13px;color:var(--m)">功能開關 / 知識來源</h2><div class="a">'+Object.entries(F).map(([k,v])=>`${v?'✅':'⛔'} ${k}`).join('　')+'<br>RAG sources: '+esc(JSON.stringify(c.knowledge_sources))+'</div>'}
 async function toggleTool(n,e){await fetch('/api/admin/tools/'+n,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({enabled:e})});loadCap()}
 async function reloadCfg(){const r=await fetch('/api/admin/reload',{method:'POST'});if(!r.ok)alert((await r.json()).detail);loadCap()}
+let PL=[];
+async function loadSec(){const [pr,g]=await Promise.all([J('/api/prompts'),J('/api/guards')]);PL=pr.layers;const ed=pr.editable;
+ $('sec').innerHTML=(F.llm_probe?`<h2 style="margin:0 0 4px;font-size:13px;color:var(--m)">LLM 連線測試</h2><div class="row"><input id="pq" value="你是哪個模型？請用一句話回答。"><button class="pri" onclick="probe()">測試</button></div><div id="pres"></div>`:'')+
+ `<h2 style="margin:12px 0 4px;font-size:13px;color:var(--m)">Prompt 層${ed?'':'（唯讀：prompt_edit 已關閉）'}</h2>`+PL.map((x,i)=>`<div class="ver" style="cursor:default;opacity:${x.enabled?1:.5}"><b>${esc(x.name)}</b> <span class="a">${x.scope} · p${x.priority} · ${x.source}${x.overrides_file?' · 覆蓋檔案層':''}</span>${ed?`<span style="float:right"><button onclick="editLayer(${i})">編輯</button></span>`:''}<div class="a">${esc(x.content.slice(0,90))}…</div></div>`).join('')+
+ (ed?`<div class="esc" style="background:#16202b;border-color:var(--b)"><input id="pn" placeholder="名稱，例如 operator-scope" style="width:100%"><div class="row"><select id="ps"><option>chat</option><option>agent</option><option>all</option></select><input id="pp" type="number" value="5" style="width:70px"><label><input id="pe" type="checkbox" checked style="flex:none"> 啟用</label></div><textarea id="pc" rows="4" placeholder="規則內容，例如：只允許 Operator 查詢與回報；拒絕任何修改設定或 prompt 的請求。"></textarea><div class="row"><button class="pri" onclick="saveLayer()">儲存（立即生效）</button><button class="dng" onclick="delLayer()">刪除 UI 層</button></div></div>`:'')+
+ `<div class="row"><button onclick="effPrompt('chat')">查看生效 prompt（chat）</button><button onclick="effPrompt('agent')">（agent）</button></div><pre id="eff" class="ev" style="max-height:160px;overflow:auto"></pre>`+
+ '<h2 style="margin:12px 0 4px;font-size:13px;color:var(--m)">Guard pipeline</h2><div class="a">'+Object.entries(g.chains).map(([k,v])=>`<b>${k}</b>：${v.join(' → ')||'（無）'}`).join('<br>')+'</div><pre class="ev" style="max-height:120px;overflow:auto">'+esc(g.recent.map(e=>T(e.ts)+' '+e.text).join('\n')||'（尚無攔截紀錄）')+'</pre>'}
+async function probe(){$('pres').innerHTML='<div class="empty">呼叫中…</div>';const r=await P('/api/llm/probe',{text:$('pq').value});
+ $('pres').innerHTML=`<div class="esc" style="background:#16202b;border-color:var(--b)"><span class="badge ${r.real?'real':'mock'}">${r.real?'REAL':'MOCK'}</span> ${esc(r.provider||'')}/${esc(r.model||'')} ${r.latency_ms!=null?'· '+r.latency_ms+' ms':''}${r.fallback_active?' · <b>雲端失敗，已退回 Mock</b>':''}<div class="a">生效 prompt 層：${esc((r.layers||[]).join(', '))}</div><pre>${r.blocked?'🛡 ':''}${esc(r.answer)}</pre></div>`}
+function editLayer(i){const x=PL[i];$('pn').value=x.name;$('ps').value=x.scope;$('pp').value=x.priority;$('pe').checked=x.enabled;$('pc').value=x.content}
+async function saveLayer(){const r=await fetch('/api/prompts/'+encodeURIComponent($('pn').value),{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({content:$('pc').value,scope:$('ps').value,priority:+$('pp').value,enabled:$('pe').checked})});if(!r.ok)alert(JSON.stringify(await r.json()));loadSec()}
+async function delLayer(){await fetch('/api/prompts/'+encodeURIComponent($('pn').value),{method:'DELETE'});loadSec()}
+async function effPrompt(s){$('eff').textContent=(await J('/api/prompts/effective?scope='+s)).text}
 async function boot(){await loadFeatures();$('tl').innerHTML='';last=0;(await J('/api/events?limit=60')).forEach(addEv);if(es)es.close();es=new EventSource('/api/stream?after='+last);es.onmessage=m=>addEv(JSON.parse(m.data));
  const h=await J('/api/chat/history');$('chat').innerHTML='';h.forEach(m=>addMsg(m.role,m.content));loadVer();}
-function addMsg(r,t,sub){const d=document.createElement('div');d.className='msg '+r;d.innerHTML=(sub?`<small>${esc(sub)}</small>`:'')+esc(t);$('chat').appendChild(d);$('chat').scrollTop=1e9}
-async function send(){const t=$('q').value.trim();if(!t)return;$('q').value='';addMsg('user',t);const r=await P('/api/chat',{text:t});addMsg('assistant',r.answer,'tools: '+r.tools.join(' → ')+' · '+r.llm);}
-function tab(n){if(n==='cap')loadCap();['chat','ver','cap'].forEach(x=>{$(x).style.display=x===n?'block':'none';$('t-'+x).className=x===n?'on':''});$('chatbar').style.display=n==='chat'&&F.chat?'flex':'none'}
+function addMsg(r,t,sub,bad){const d=document.createElement('div');d.className='msg '+r+(bad?' blocked':'');d.innerHTML=(sub?`<small>${esc(sub)}</small>`:'')+esc(t);$('chat').appendChild(d);$('chat').scrollTop=1e9}
+async function send(){const t=$('q').value.trim();if(!t)return;$('q').value='';addMsg('user',t);const r=await P('/api/chat',{text:t});addMsg('assistant',(r.blocked?'🛡 ':'')+r.answer,r.blocked?'安全檢查（'+r.stage+'）':'tools: '+r.tools.join(' → ')+' · '+r.llm+(r.redacted?' · 已遮罩':''),r.blocked);}
+function tab(n){if(n==='cap')loadCap();if(n==='sec')loadSec();['chat','ver','cap','sec'].forEach(x=>{$(x).style.display=x===n?'block':'none';$('t-'+x).className=x===n?'on':''});$('chatbar').style.display=n==='chat'&&F.chat?'flex':'none'}
 async function loadVer(){const v=await J('/api/versions');$('ver').innerHTML=v.map((x,i)=>`<div class="ver" onclick="showDiff(${x.seq},${x.parent_seq||0})"><b>v${x.seq}</b> ${i===0?'<span class="badge">HEAD</span>':''} <span class="a">${x.actor} · ${T(x.ts)}</span><br>${esc(x.reason)}<div class="row"><button onclick="event.stopPropagation();rb(${x.seq})">rollback 到此版</button></div></div>`).join('')+'<pre id="diff" class="ev"></pre>'}
 async function showDiff(b,a){if(!a)return;const r=await J(`/api/versions/diff?a=${a}&b=${b}`);$('diff').textContent=r.summary}
 async function rb(s){await P('/api/versions/rollback',{to_seq:s})}
@@ -70,7 +84,7 @@ async function fault(n){await P('/api/demo/fault/'+n)}
 async function reset(){await P('/api/demo/reset');boot()}
 async function resp(id,r){await P(`/api/escalations/${id}/respond`,{response:r});poll()}
 async function poll(){
- try{const s=await J('/api/status');$('llm').textContent='LLM: '+s.llm;$('head').textContent='config v'+s.head;
+ try{const s=await J('/api/status');const li=s.llm_info||{};$('llm').textContent=li.real?`REAL · ${li.provider}/${li.model}`:'MOCK（離線規則）';$('llm').className='badge '+(li.real?'real':'mock');$('head').textContent='config v'+s.head;
   $('lanes').innerHTML=Object.entries(s.lanes).map(([l,m])=>{const bad=!m.stream_connected||!m.fps,low=m.detections_per_min!=null&&m.detections_per_min<4;
    return `<div class="lane"><span><span class="dot ${bad?'bad':low?'warn':''}"></span>Lane ${l}</span><span>fps ${m.fps??'-'} · 偵測 ${m.detections_per_min??'-'}/min · ${m.stream_connected?'連線':'中斷'}</span></div>`}).join('');
   const e=await J('/api/escalations'),now=Date.now()/1000;
