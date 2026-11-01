@@ -67,3 +67,9 @@ def client(d):
     from aicam.api.app import create_app
     from aicam.core.loop import Agent
     return TestClient(create_app(rt=d, agent=Agent(d), background=False))
+
+
+@pytest.fixture
+def agent(d):
+    from aicam.core.loop import Agent
+    return Agent(d)
