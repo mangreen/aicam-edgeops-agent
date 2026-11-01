@@ -12,6 +12,7 @@ from aicam.prompts import PromptStore
 
 @dataclass
 class Runtime:
+    """所有 port 實例與可熱重載的外掛狀態（tools / skills / guards / prompts）。核心邏輯只依賴它。"""
     s: Settings
     db: DB
     obs: SqliteObs

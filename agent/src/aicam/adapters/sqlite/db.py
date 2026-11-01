@@ -1,3 +1,4 @@
+"""SQLite 連線與 schema。POC 的所有 SQLite adapter 共用這個連線。"""
 import sqlite3
 import threading
 

@@ -6,6 +6,7 @@ from aicam.core import versions as V
 
 
 class SqliteVersions:
+    """版本快照儲存（append-only，內容以 canonical JSON + sha256 保存）。"""
     def __init__(self, db): self.db = db
 
     def _row(self, r):

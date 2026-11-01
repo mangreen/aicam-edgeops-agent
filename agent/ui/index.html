@@ -58,7 +58,7 @@ async function loadCap(){const c=await J('/api/capabilities');const lv={L0:'#5b6
  '<h2 style="margin:10px 0 4px;font-size:13px;color:var(--m)">Skills</h2>'+(c.skills.map(k=>`<div class="ver" style="cursor:default"><span class="dot ${k.active?'':'bad'}"></span><b>${k.name}</b> <span class="a">${esc(k.reason)}</span><div class="a">${esc(k.description)}</div></div>`).join('')||'<div class="empty">無</div>')+
  '<h2 style="margin:10px 0 4px;font-size:13px;color:var(--m)">功能開關 / 知識來源</h2><div class="a">'+Object.entries(F).map(([k,v])=>`${v?'✅':'⛔'} ${k}`).join('　')+'<br>RAG sources: '+esc(JSON.stringify(c.knowledge_sources))+'</div>'}
 async function toggleTool(n,e){await fetch('/api/admin/tools/'+n,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({enabled:e})});loadCap()}
-async function reloadCfg(){const r=await fetch('/api/admin/reload',{method:'POST'});if(!r.ok)alert((await r.json()).detail);loadCap()}
+async function reloadCfg(){const r=await fetch('/api/admin/reload',{method:'POST'});if(!r.ok)alert((await r.json()).detail);await loadFeatures();loadCap()}
 let PL=[];
 async function loadSec(){const [pr,g]=await Promise.all([J('/api/prompts'),J('/api/guards')]);PL=pr.layers;const ed=pr.editable;
  $('sec').innerHTML=(F.llm_probe?`<h2 style="margin:0 0 4px;font-size:13px;color:var(--m)">LLM 連線測試</h2><div class="row"><input id="pq" value="你是哪個模型？請用一句話回答。"><button class="pri" onclick="probe()">測試</button></div><div id="pres"></div>`:'')+

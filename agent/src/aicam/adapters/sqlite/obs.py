@@ -2,6 +2,7 @@
 
 
 class SqliteObs:
+    """logs / metrics / spans 的 SQLite 儲存與查詢。"""
     def __init__(self, db): self.db = db
 
     def ingest(self, logs, metrics, spans):

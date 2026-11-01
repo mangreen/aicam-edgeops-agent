@@ -8,10 +8,12 @@ from .mock import MockLLM
 
 
 class LLMError(Exception):
+    """LLM 回應不符預期格式（例如非法 JSON 或不在允許清單的工具）。"""
     ...
 
 
 class CloudLLM(MockLLM):
+    """雲端 LLM 共用邏輯：把 plan／report／chat 轉成 prompt 並解析 JSON；失敗時 raise，由 AutoLLM 退回 Mock。"""
     real = True
 
     def info(self): return {"provider": self.name, "model": getattr(self, "model", "?"), "real": True}
@@ -58,6 +60,7 @@ class CloudLLM(MockLLM):
 
 
 class OpenAICompat(CloudLLM):
+    """OpenAI-compatible chat/completions（OpenAI 與 OpenRouter 共用）。"""
     def __init__(self, name, base, key, model, extra_headers=None):
         self.name, self.base, self.key, self.model, self.eh = name, base.rstrip("/"), key, model, extra_headers or {}
 
@@ -71,6 +74,7 @@ class OpenAICompat(CloudLLM):
 
 
 class AnthropicLLM(CloudLLM):
+    """Anthropic Messages API。"""
     name = "anthropic"
 
     def __init__(self, key, model): self.key, self.model = key, model

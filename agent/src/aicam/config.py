@@ -16,6 +16,7 @@ FEATURE_DEFAULTS = {"chat": True, "tool_toggle": False, "admin_reload": False, "
 
 @dataclass(frozen=True)
 class DetectorCfg:
+    """偵測與驗證用的門檻（原本散落在程式中的魔術數字）。"""
     window_sec: float = 20.0          # 只看最近 N 秒的樣本，避免舊資料觸發
     min_detections: float = 4.0       # 偵測數低於此值視為驟降／高於此值視為健康
     suspect_window_sec: float = 900.0  # 變更與異常的關聯視窗
@@ -25,6 +26,7 @@ class DetectorCfg:
 
 @dataclass(frozen=True)
 class PolicyCfg:
+    """Policy gate 的頻率限制與 Agent 可自行修改的設定白名單。"""
     l1_max_per_10min: int = 2         # L1 動作頻率上限，防止重啟風暴
     rate_window_sec: float = 600.0
     # Agent 自行 apply_config 時只能改這些設定路徑（fnmatch）；其他需 Operator 確認
@@ -33,6 +35,7 @@ class PolicyCfg:
 
 @dataclass(frozen=True)
 class Settings:
+    """不可變設定。TOML 區段保存在 raw，由 plugins／guards／prompts 各自解析。"""
     db_path: str = ":memory:"
     sim_url: str = "http://sim:8001"
     verify_wait: float = 7.0

@@ -1,3 +1,4 @@
+"""EdgeControlPort 的 sim 實作：以 HTTP 呼叫模擬器控制 API（POC）。正式版換成真實邊緣控制通道。"""
 import httpx
 
 

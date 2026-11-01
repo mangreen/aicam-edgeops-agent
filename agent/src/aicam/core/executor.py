@@ -10,6 +10,7 @@ from aicam.core import versions as V
 
 @dataclass
 class Call:
+    """一次工具呼叫的情境：誰（actor）、從哪裡來（origin）、屬於哪個 issue、是否已獲 Operator 核准。"""
     issue_id: int | None = None
     actor: str = "agent"       # agent | operator | engineer
     origin: str = "agent"      # agent | chat | ui | external
