@@ -1,5 +1,7 @@
 """版本快照：append-only；rollback = 新增一版（內容等於目標版）；雜湊相同不新增。"""
-import hashlib, json, re
+import hashlib
+import json
+import re
 
 _CRED = re.compile(r"://[^/\s:\"]+:[^@\s\"]+@")
 

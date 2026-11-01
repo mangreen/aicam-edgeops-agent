@@ -1,12 +1,11 @@
 """Agent loop：Detect → Triage → Plan → Policy Gate → Execute → Verify → Report / 升級。"""
-import asyncio, json, time
-from . import versions as V
-from .llm import KIND_ZH
-from .tools import Call, execute
+import asyncio
+import json
+import time
 
-HINT = {"camera_no_signal": "請檢查攝影機電源、PoE 與網路線",
-        "inference_stalled": "請檢查邊緣主機資源與推論服務",
-        "detection_drop": "請確認近期設定變更並檢視 ROI／門檻"}
+from aicam.core import versions as V
+from aicam.core.constants import HINT, KIND_ZH
+from aicam.plugins.tools import Call, execute
 
 
 class Agent:
@@ -18,13 +17,13 @@ class Agent:
 
     # ---------- Detect ----------
     def classify(self, lane):
-        n, since = self.d.s.detect_samples, max(self.last_close.get(lane, 0), time.time() - 20)
+        n, since = self.d.s.detect_samples, max(self.last_close.get(lane, 0), time.time() - self.d.s.detector.window_sec)
         g = {k: self.d.obs.metrics(lane, k, since, limit=n) for k in ("stream_connected", "fps", "detections_per_min")}
         if any(len(v) < n for v in g.values()):
             return None
         if all(x["value"] == 0 for x in g["stream_connected"]): return "camera_no_signal"
         if all(x["value"] == 0 for x in g["fps"]): return "inference_stalled"
-        if all(x["value"] < 4 for x in g["detections_per_min"]): return "detection_drop"
+        if all(x["value"] < self.d.s.detector.min_detections for x in g["detections_per_min"]): return "detection_drop"
         return None
 
     async def tick(self):
@@ -110,17 +109,17 @@ class Agent:
             return await self.d.llm.mock.plan(ctx)
 
     def find_suspect(self, lane, created):
-        d = self.d
+        d, dc = self.d, self.d.s.detector
         head = d.versions.head()
-        if not head or head["parent_seq"] is None or head["ts"] < created - 900:
+        if not head or head["parent_seq"] is None or head["ts"] < created - dc.suspect_window_sec:
             return None
         parent = d.versions.get(head["parent_seq"])
         rel = [x for x in V.diff(parent["content"], head["content"])
                if x["path"].startswith(f"lanes.{lane}.") or not x["path"].startswith("lanes.")]
-        rows = d.obs.metrics(lane, "detections_per_min", head["ts"] - 900)
+        rows = d.obs.metrics(lane, "detections_per_min", head["ts"] - dc.suspect_window_sec)
         b = [r["value"] for r in rows if r["ts"] <= head["ts"]]
         a = [r["value"] for r in rows if r["ts"] > head["ts"]]
-        if not (rel and a and b) or sum(a) / len(a) > 0.5 * sum(b) / len(b):
+        if not (rel and a and b) or sum(a) / len(a) > dc.drop_ratio * sum(b) / len(b):
             return None
         return {"seq": head["seq"], "parent_seq": head["parent_seq"], "actor": head["actor"],
                 "diff": V.fmt_diff(rel),
@@ -129,8 +128,8 @@ class Agent:
     # ---------- Verify ----------
     def healthy(self, lane, since):
         g = {k: self.d.obs.metrics(lane, k, since) for k in ("stream_connected", "fps", "detections_per_min")}
-        return (all(len(v) >= 2 for v in g.values()) and all(x["value"] == 1 for x in g["stream_connected"])
-                and all(x["value"] > 0 for x in g["fps"]) and all(x["value"] >= 4 for x in g["detections_per_min"]))
+        return (all(len(v) >= self.d.s.detector.healthy_min_samples for v in g.values()) and all(x["value"] == 1 for x in g["stream_connected"])
+                and all(x["value"] > 0 for x in g["fps"]) and all(x["value"] >= self.d.s.detector.min_detections for x in g["detections_per_min"]))
 
     async def verify(self, iid, lanes, since):
         await asyncio.sleep(self.d.s.verify_wait)
@@ -173,7 +172,7 @@ class Agent:
         resp = await self._wait(eid, to)
         if resp == "fixed":
             since = time.time()
-            await d.sim.physical_fix(lane)      # POC：模擬現場修復
+            await d.edge.physical_fix(lane)      # POC：模擬現場修復
             self.ev(iid, "operator", "Operator 回報「已處理」（POC：模擬現場修復）")
             if await self.verify(iid, [lane], since):
                 return await self.resolve(iid, "operator", "Operator 現場處理後恢復")
@@ -202,7 +201,7 @@ class Agent:
         self.ev(iid, "escalate", f"已呼叫遠端工程師（#{eid}）：incident bundle 已送出（摘要、時間軸、已嘗試動作、logs、建議下一步）")
         if await self._wait(eid, None) == "fixed":
             since = time.time()
-            await d.sim.physical_fix(lane)
+            await d.edge.physical_fix(lane)
             self.ev(iid, "engineer", "遠端工程師回報「已修復」（POC：模擬）")
             ok = await self.verify(iid, [lane], since)
             await self.resolve(iid, "engineer", "遠端工程師處理後恢復" if ok else "遠端工程師已處理，仍需觀察")

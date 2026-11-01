@@ -6,7 +6,7 @@ L0 = {"get_status", "query_logs", "query_metrics", "query_traces", "search_knowl
 L1 = {"restart_pipeline", "reconnect_stream", "apply_config"}
 L2 = {"reboot_device", "rollback_version"}      # rollback 依情境於下方動態判定
 L3 = {"firmware_update", "ssh_exec", "replace_model"}
-RATE_WINDOW = 600
+RATE_WINDOW = 600  # 預設值；實際由 ctx["rate_window"] 提供（設定檔）
 
 
 @dataclass
@@ -31,7 +31,7 @@ def evaluate(tool: str, args: dict, ctx: dict) -> Decision:
             return Decision("L1", "allow", f"{ctx['actor']} 變更，僅記錄來源並自動快照")
         lane = args.get("lane")
         n = sum(1 for a in ctx.get("recent", [])
-                if a["tool"] == tool and a.get("lane") == lane and ctx["now"] - a["ts"] < RATE_WINDOW)
+                if a["tool"] == tool and a.get("lane") == lane and ctx["now"] - a["ts"] < ctx.get("rate_window", RATE_WINDOW))
         mx = ctx.get("l1_max", 2)
         if n >= mx:
             return Decision("L1", "deny", f"超過 L1 頻率限制（{mx} 次/10 分鐘），防止重啟風暴")

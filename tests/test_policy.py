@@ -1,5 +1,6 @@
 import time
-from app import policy
+
+from aicam.core import policy
 
 NOW = time.time()
 HEAD = {"seq": 7, "parent_seq": 6, "actor": "engineer", "issue_id": None}

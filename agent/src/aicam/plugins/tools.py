@@ -1,7 +1,11 @@
 """Tool registry。schema 採 MCP 相容格式（name / description / inputSchema），日後可直接掛 MCP server。"""
-import json, time, uuid
+import json
+import time
+import uuid
 from dataclasses import dataclass
-from . import policy, versions as V
+
+from aicam.core import policy
+from aicam.core import versions as V
 
 
 @dataclass
@@ -145,13 +149,13 @@ async def propose_rollback(d, c, to_seq=None):
 # ---------- L1/L2 會改變系統 ----------
 @tool("restart_pipeline", "重啟推論 pipeline（L1）", {"lane": _int("車道")}, ("lane",))
 async def restart_pipeline(d, c, lane):
-    r = await d.sim.restart_pipeline(lane)
+    r = await d.edge.restart_pipeline(lane)
     return {"ok": r.get("ok", False), "summary": r.get("msg", "")}
 
 
 @tool("reconnect_stream", "重連攝影機串流（L1）", {"lane": _int("車道")}, ("lane",))
 async def reconnect_stream(d, c, lane):
-    r = await d.sim.reconnect_stream(lane)
+    r = await d.edge.reconnect_stream(lane)
     return {"ok": r.get("ok", False), "summary": r.get("msg", "")}
 
 
@@ -161,7 +165,7 @@ async def _commit_push(d, c, content, reason):
     except ValueError as e:
         return {"ok": False, "summary": str(e)}
     if changed:
-        await d.sim.push_config(v["content"])
+        await d.edge.push_config(v["content"])
         d.issues.event(c.issue_id, "version", f"新增 v{v['seq']}（{c.actor}）：{reason}")
     return {"ok": True, "changed": changed, "seq": v["seq"],
             "summary": f"v{v['seq']} {'已建立' if changed else '內容相同，未新增版本'}"}
@@ -186,9 +190,10 @@ async def rollback_version(d, c, to_seq, evidence=None):
 def _pctx(d, c, args):
     return {"now": time.time(), "origin": c.origin, "approved": c.approved, "issue_id": c.issue_id,
             "actor": c.actor, "head": d.versions.head(),
-            "l1_max": (d.versions.head() or {"content": {}})["content"].get("policy", {}).get("l1_max_per_10min", 2),
+            "rate_window": d.s.policy.rate_window_sec,
+            "l1_max": (d.versions.head() or {"content": {}})["content"].get("policy", {}).get("l1_max_per_10min", d.s.policy.l1_max_per_10min),
             "recent": [{"tool": a["tool"], "lane": json.loads(a["args"]).get("lane"), "ts": a["ts"]}
-                       for a in d.issues.actions(since=time.time() - policy.RATE_WINDOW)
+                       for a in d.issues.actions(since=time.time() - d.s.policy.rate_window_sec)
                        if a["status"] in ("ok", "failed", "running")]}
 
 

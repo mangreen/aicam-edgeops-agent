@@ -1,7 +1,9 @@
 """POC 專用：預先 seed 7 天歷史資料（版本史 v1~v6、metrics、incident logs、issues、對話）。"""
-import json, math, time
+import math
+import time
 from pathlib import Path
-from . import versions as V
+
+from aicam.core import versions as V
 
 DAY, H = 86400, 3600
 BASE = {"model": "vehicle-det-1.1.0", "policy": {"l1_max_per_10min": 2},
@@ -64,6 +66,6 @@ def run(d, force=False):
     d.obs.ingest(logs, metrics, spans)
     for ago, role, text in MSGS:
         d.issues.msg_add(role, text, "default", now - ago * DAY)
-    for p in sorted(Path(__file__).resolve().parent.parent.joinpath("runbooks").glob("*.md")):
+    for p in sorted(Path(__file__).resolve().parents[3].joinpath("runbooks").glob("*.md")):
         t = p.read_text(encoding="utf-8")
         d.kb.index(t.splitlines()[0].lstrip("# "), t, "runbook")

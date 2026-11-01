@@ -1,5 +1,10 @@
 """POC 專用：模擬門市邊緣端（攝影機 + 推論 + 上傳器）。不屬於正式執行路徑。"""
-import asyncio, os, random, time, uuid
+import asyncio
+import os
+import random
+import time
+import uuid
+
 import httpx
 from fastapi import FastAPI, HTTPException
 
