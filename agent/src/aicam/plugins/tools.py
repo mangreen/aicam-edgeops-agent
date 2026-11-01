@@ -1,7 +1,7 @@
 """Tool registry。schema 採 MCP 相容格式（name / description / inputSchema），日後可直接掛 MCP server。"""
 import json, time, uuid
 from dataclasses import dataclass
-from . import policy, versions as V
+from aicam.core import policy, versions as V
 
 
 @dataclass

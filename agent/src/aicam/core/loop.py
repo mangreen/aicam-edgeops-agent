@@ -1,8 +1,8 @@
 """Agent loop：Detect → Triage → Plan → Policy Gate → Execute → Verify → Report / 升級。"""
 import asyncio, json, time
-from . import versions as V
-from .llm import KIND_ZH
-from .tools import Call, execute
+from aicam.core import versions as V
+from aicam.core.constants import KIND_ZH
+from aicam.plugins.tools import Call, execute
 
 HINT = {"camera_no_signal": "請檢查攝影機電源、PoE 與網路線",
         "inference_stalled": "請檢查邊緣主機資源與推論服務",

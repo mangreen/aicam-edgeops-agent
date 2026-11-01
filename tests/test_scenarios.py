@@ -1,7 +1,7 @@
 import asyncio
 from conftest import emit
-from app.tools import Call, execute
-from app import chat
+from aicam.plugins.tools import Call, execute
+from aicam.core import chat
 
 
 async def _pending(d, to, timeout=5):
@@ -97,7 +97,7 @@ async def test_chat_rollback_needs_confirmation(d):
 
 
 async def test_llm_cloud_failure_falls_back_to_mock(d):
-    from app.llm import AutoLLM, CloudLLM
+    from aicam.adapters.llm import AutoLLM, CloudLLM
     class Broken(CloudLLM):
         name = "broken"
         async def _complete(self, s, u): raise ConnectionError("offline")

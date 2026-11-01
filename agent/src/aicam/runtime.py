@@ -1,7 +1,7 @@
 import os
 from dataclasses import dataclass, field
-from . import adapters as A
-from .db import DB
+from aicam.adapters import sqlite as A
+from aicam.adapters.sqlite import DB
 
 
 @dataclass

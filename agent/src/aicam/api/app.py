@@ -3,14 +3,16 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
-from . import chat, seed, tools
-from .deps import Settings, build
-from .llm import make_llm
-from .loop import Agent
-from .simclient import SimClient
-from .tools import Call
+from aicam.adapters.edge import SimClient
+from aicam.adapters.llm import make_llm
+from aicam.core import chat
+from aicam.core.loop import Agent
+from aicam.plugins import tools
+from aicam.plugins.tools import Call
+from aicam.poc import seed
+from aicam.runtime import Settings, build
 
-UI = Path(__file__).resolve().parent.parent / "ui"
+UI = Path(__file__).resolve().parents[3] / "ui"
 d = Agent_ = None
 
 

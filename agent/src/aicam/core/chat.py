@@ -1,6 +1,6 @@
 import json
-from .llm import CHAT_TOOLS
-from .tools import Call, execute
+from aicam.core.constants import CHAT_TOOLS
+from aicam.plugins.tools import Call, execute
 
 
 async def handle(d, text, session="default"):

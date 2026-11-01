@@ -1,11 +1,11 @@
 import sys, time
 from pathlib import Path
 import pytest
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "agent"))
-from app import seed
-from app.deps import Settings, build
-from app.llm import AutoLLM
-from app.loop import Agent
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "agent" / "src"))
+from aicam.poc import seed
+from aicam.runtime import Settings, build
+from aicam.adapters.llm import AutoLLM
+from aicam.core.loop import Agent
 
 
 def emit(d, lane, fps=15.0, conn=1.0, det=14.0, n=3):

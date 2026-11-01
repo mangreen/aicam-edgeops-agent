@@ -1,0 +1,63 @@
+"""POC 專用：決定性規則 + 模板的 Mock LLM。不屬於正式執行路徑。"""
+import re
+from aicam.core.constants import KIND_ZH, CAUSE
+
+
+class MockLLM:
+    name = "mock"
+
+    async def plan(self, ctx):
+        k, lane, h = ctx["kind"], ctx["lane"], ctx["history"]
+        fails = [x for x in h if not x["ok"]]
+        if k == "inference_stalled" and len(fails) < 2:
+            return {"tool": "restart_pipeline", "args": {"lane": lane}, "rationale": "FPS 歸零但串流正常，依 runbook 先重啟 pipeline"}
+        if k == "camera_no_signal" and len(fails) < 2:
+            return {"tool": "reconnect_stream", "args": {"lane": lane}, "rationale": "串流中斷，依 runbook 先嘗試重連"}
+        if k == "detection_drop" and ctx.get("suspect") and not h:
+            s = ctx["suspect"]
+            return {"tool": "rollback_version", "args": {"to_seq": s["parent_seq"], "evidence": s["evidence"]},
+                    "rationale": f"v{s['seq']}（{s['actor']}）變更後偵測數驟降，建議回到 v{s['parent_seq']}"}
+        return {"tool": "escalate", "args": {}, "rationale": "自動修復已無可行或安全的動作，升級處理"}
+
+    async def report(self, ctx):
+        i, acts = ctx["issue"], ctx["actions"]
+        steps = "、".join(f"{a['tool']}({a['status']})" for a in acts) or "無"
+        sus = ctx.get("suspect")
+        extra = f"\n變更證據：v{sus['seq']} {sus['diff']}；{sus['evidence']}" if sus else ""
+        return (f"【事件報告 #{i['id']}】Lane {i['lane']} {KIND_ZH.get(i['kind'], i['kind'])}\n"
+                f"根因：{CAUSE.get(i['kind'], '未知')}\n處置：{steps}\n結果：{ctx['outcome']}{extra}")
+
+    async def chat_plan(self, text, history):
+        t, calls = text.lower(), []
+        m = re.search(r"lane\s*(\d)", t)
+        lane = int(m.group(1)) if m else None
+        d, hr = re.search(r"(\d+)\s*天", t), re.search(r"(\d+)\s*小時", t)
+        hours = int(d.group(1)) * 24 if d else int(hr.group(1)) if hr else None
+        vm = re.search(r"v(\d+).*?v(\d+)", t)
+        if re.search(r"回到上一版|rollback|回滾|還原", t):
+            return [{"tool": "diff_versions", "args": {}}, {"tool": "propose_rollback", "args": {}}]
+        if vm:
+            return [{"tool": "diff_versions", "args": {"a": int(vm.group(1)), "b": int(vm.group(2))}}]
+        if re.search(r"聊過|之前問|歷史對話|上次問", t):
+            return [{"tool": "search_history", "args": {"query": f"Lane {lane}" if lane else text[:10]}}]
+        if re.search(r"類似|上次|怎麼解|歷史|issue", t):
+            kind = ("camera_no_signal" if re.search(r"斷線|無訊號|攝影機|camera", t) else
+                    "detection_drop" if re.search(r"偵測|roi", t) else
+                    "inference_stalled" if re.search(r"卡|stall|fps|推論", t) else None)
+            calls = [{"tool": "search_issues", "args": {"kind": kind, "lane": lane}}]
+            return calls + [{"tool": "search_knowledge", "args": {"query": kind or text}}]
+        if re.search(r"斷線|disconnect|無訊號", t):
+            return [{"tool": "query_logs", "args": {"lane": lane, "contains": "stream disconnected", "since_hours": hours or 168}}]
+        if re.search(r"改了什麼|誰改|版本|version", t):
+            return [{"tool": "list_versions", "args": {"limit": 5}}]
+        if re.search(r"trace|追蹤|span", t):
+            return [{"tool": "query_traces", "args": {"lane": lane, "status": "error", "since_hours": hours or 1}}]
+        if re.search(r"fps|metric|指標|偵測數", t):
+            name = "detections_per_min" if re.search(r"偵測", t) else "fps"
+            return [{"tool": "query_metrics", "args": {"lane": lane or 1, "name": name, "since_hours": hours or 1}}]
+        if re.search(r"狀態|status|現在", t):
+            return [{"tool": "get_status", "args": {}}]
+        return [{"tool": "search_knowledge", "args": {"query": text}}]
+
+    async def chat_answer(self, text, results):
+        return "\n".join(f"• {r.get('summary', '')}" for r in results) or "找不到相關資料。"
