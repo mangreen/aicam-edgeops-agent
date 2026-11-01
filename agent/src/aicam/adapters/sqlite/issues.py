@@ -4,6 +4,7 @@ import time
 
 
 class SqliteIssues:
+    """issue、事件時間軸、action 紀錄、升級請求與對話歷史。"""
     def __init__(self, db): self.db = db
 
     def create(self, lane, kind):

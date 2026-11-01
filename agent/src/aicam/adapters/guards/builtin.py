@@ -43,6 +43,7 @@ def _first(patterns, text):
 
 
 class Length:
+    """輸入長度上限。"""
     name = "length"
 
     def __init__(self, conf): self.max = int(conf.get("max_chars", 1000))
@@ -54,6 +55,7 @@ class Length:
 
 
 class Injection:
+    """偵測 prompt injection 樣式（中英文）。"""
     name = "injection"
 
     def __init__(self, conf): self.patterns = INJECTION + list(conf.get("extra", []))
@@ -77,6 +79,7 @@ class RoleScope:
 
 
 class SecretRedact:
+    """遮罩輸出中的 API key、token、密碼、帶憑證的 RTSP URL。"""
     name = "secret_redact"
 
     def __init__(self, conf): ...
@@ -107,6 +110,7 @@ class PromptLeak:
 
 
 class UnsafeCommand:
+    """移除輸出中的危險 shell／SQL 指令。"""
     name = "unsafe_command"
 
     def __init__(self, conf): ...

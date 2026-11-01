@@ -8,6 +8,7 @@ REFUSAL = {"input": "（已被安全檢查阻擋）{reason}", "output": "（回�
 
 @dataclass
 class Outcome:
+    """Guard pipeline 的執行結果；text 為最終可用文字（block 時為拒絕訊息）。"""
     action: str                       # allow | block | redact | flag
     text: str
     hits: list = field(default_factory=list)
@@ -20,6 +21,7 @@ class Outcome:
 
 
 class GuardPipeline:
+    """依設定的 chain 依序執行 guard；每個非 allow 的命中都會透過 on_hit 記錄成事件。"""
     def __init__(self, chains: dict, on_hit=None):
         self.chains, self.on_hit = chains, on_hit
 

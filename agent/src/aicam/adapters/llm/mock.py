@@ -5,6 +5,7 @@ from aicam.core.constants import CAUSE, KIND_ZH
 
 
 class MockLLM:
+    """決定性規則 + 模板的離線 LLM（POC 專用）。規劃依事件類型走固定規則；不解讀 prompt。"""
     name = "mock"
 
     async def plan(self, ctx):

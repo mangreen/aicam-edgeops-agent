@@ -2,6 +2,7 @@
 
 
 class FtsKnowledge:
+    """FTS5（trigram，支援中文）全文檢索；2 字以下查詢退回 LIKE。"""
     def __init__(self, db): self.db = db
 
     def index(self, title, body, kind):

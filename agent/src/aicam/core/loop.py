@@ -10,6 +10,12 @@ from aicam.core.untrusted import wrap
 
 
 class Agent:
+    """Agent loop：偵測 → Triage → 規劃 → Policy Gate → 執行 → Verify → 報告／升級。
+
+    狀態（issues.status）：detected → triaging → acting → verifying → resolved；
+    失敗路徑：waiting_operator →（Operator 無法處理／逾時）→ escalated_engineer → resolved。
+    設計重點：LLM 只提案，Policy Gate 決定能否執行；動作後一定 Verify；每條車道同時最多一個 open issue；
+    L1 動作失敗 2 次、被 Policy 擋下、或 rollback Verify 失敗，一律升級而不是重試。"""
     def __init__(self, d):
         self.d, self.tasks, self.last_close = d, {}, {}
 

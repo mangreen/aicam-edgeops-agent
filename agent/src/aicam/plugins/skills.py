@@ -9,6 +9,7 @@ from pathlib import Path
 
 @dataclass
 class Skill:
+    """一份 skill（SKILL.md）；需要的工具被停用時 active=False，不會注入 prompt。"""
     name: str
     description: str
     tools: tuple

@@ -7,6 +7,7 @@ RATE_WINDOW = 600  # 預設值；實際由 ctx["rate_window"] 提供（設定檔
 
 @dataclass
 class Decision:
+    """Policy 判定結果：level（L0–L3）、verdict（allow／needs_operator／escalate_engineer／deny）與原因。"""
     level: str      # L0..L3
     verdict: str    # allow | needs_operator | escalate_engineer | deny
     reason: str

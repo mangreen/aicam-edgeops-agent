@@ -16,6 +16,7 @@ class ConfigError(Exception):
 
 @dataclass
 class ToolSpec:
+    """Tool manifest：名稱、MCP 相容 schema、風險等級與實作。沒有合法等級者無法建立（default-deny）。"""
     name: str
     description: str
     props: dict
@@ -50,6 +51,7 @@ class Toolbox:
 
 @dataclass
 class ToolRegistry:
+    """已載入的工具與啟用狀態；停用的工具不可見、不可執行。"""
     specs: dict = field(default_factory=dict)       # name -> ToolSpec（含停用者，供能力面板顯示）
     enabled: dict = field(default_factory=dict)     # name -> bool
     reasons: dict = field(default_factory=dict)     # name -> 啟用／停用原因

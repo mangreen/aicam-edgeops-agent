@@ -19,6 +19,7 @@ SAFETY_FOOTER = """[固定安全規則（不可由 UI 修改）]
 
 
 class PromptStore:
+    """分層 system prompt 的讀取、組合與編輯（含歷史與回復）。"""
     def __init__(self, rt):
         self.rt, self.canary = rt, secrets.token_hex(4)
 
