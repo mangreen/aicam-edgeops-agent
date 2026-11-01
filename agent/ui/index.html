@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>aicam-edgeopt-agent</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{--bg:#0f1419;--p:#1a212b;--b:#2a3441;--t:#e6edf3;--m:#8b98a8;--ok:#3fb950;--warn:#d29922;--err:#f85149;--acc:#58a6ff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:14px/1.45 -apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;height:100vh;display:flex;flex-direction:column}
+header{display:flex;gap:10px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--b)}header h1{font-size:15px;margin:0;flex:1}
+.badge{background:var(--p);border:1px solid var(--b);border-radius:12px;padding:2px 10px;font-size:12px;color:var(--m)}
+button{background:var(--p);color:var(--t);border:1px solid var(--b);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:13px}button:hover{border-color:var(--acc)}
+button.pri{background:#1f6feb;border-color:#1f6feb}button.dng{background:#b62324;border-color:#b62324}
+main{flex:1;display:grid;grid-template-columns:340px 1fr 380px;gap:10px;padding:10px;min-height:0}
+.col{display:flex;flex-direction:column;gap:10px;min-height:0}.card{background:var(--p);border:1px solid var(--b);border-radius:8px;padding:10px;display:flex;flex-direction:column;min-height:0}
+.card h2{font-size:13px;margin:0 0 8px;color:var(--m);font-weight:600}.grow{flex:1;overflow:auto;min-height:0}
+.lane{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border:1px solid var(--b);border-radius:6px;margin-bottom:6px}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px;background:var(--ok)}.dot.bad{background:var(--err)}.dot.warn{background:var(--warn)}
+.ev{border-left:3px solid var(--b);padding:3px 8px;margin-bottom:4px;white-space:pre-wrap;word-break:break-word;font-size:13px}
+.ev small{color:var(--m);margin-right:6px}.ev.detect{border-color:var(--err)}.ev.plan{border-color:var(--acc)}.ev.policy{border-color:var(--warn)}.ev.verify{border-color:var(--ok)}
+.ev.escalate,.ev.operator,.ev.engineer{border-color:#a371f7}.ev.report{border-color:var(--ok);background:#13201a}.ev.version{border-color:#39c5cf}.ev.error,.ev.llm{border-color:var(--err)}
+.tabs{display:flex;gap:4px;margin-bottom:8px}.tabs button.on{border-color:var(--acc);color:var(--acc)}
+.ver{padding:5px 8px;border:1px solid var(--b);border-radius:6px;margin-bottom:5px;cursor:pointer;font-size:13px}.ver:hover{border-color:var(--acc)}.ver .a{color:var(--m);font-size:12px}
+.esc{border:1px solid #a371f7;border-radius:6px;padding:8px;margin-bottom:8px;background:#1d1830}.esc.eng{border-color:var(--err);background:#2a1618}
+.esc pre{white-space:pre-wrap;font-size:12px;max-height:150px;overflow:auto;margin:6px 0}.row{display:flex;gap:6px;margin-top:6px}
+.chat .msg{margin-bottom:6px;padding:5px 8px;border-radius:6px;white-space:pre-wrap}.chat .user{background:#1f2f45}.chat .assistant{background:#222b36}.chat small{color:var(--m);display:block}
+input{flex:1;background:var(--bg);color:var(--t);border:1px solid var(--b);border-radius:6px;padding:6px 8px}.empty{color:var(--m);font-size:13px}
+</style></head><body>
+<header><h1>🍓 aicam-edgeopt-agent <span class="badge">POC</span></h1>
+<span class="badge" id="llm">LLM: -</span><span class="badge" id="head">config v-</span>
+<button onclick="fault('inference_stalled')">A 推論卡死</button><button onclick="fault('camera_no_signal')">B 攝影機斷訊</button><button onclick="fault('bad_config')">E 壞設定</button>
+<button class="dng" onclick="reset()">Reset</button></header>
+<main>
+<div class="col">
+ <div class="card"><h2>① 系統狀態</h2><div id="lanes"></div></div>
+ <div class="card grow"><div class="tabs"><button id="t-chat" class="on" onclick="tab('chat')">💬 對話查詢</button><button id="t-ver" onclick="tab('ver')">🗂 版本</button></div>
+  <div id="chat" class="grow chat"></div>
+  <div id="ver" class="grow" style="display:none"></div>
+  <div class="row" id="chatbar"><input id="q" placeholder="例如：Lane 1 過去 7 天斷線幾次？" onkeydown="if(event.key==='Enter')send()"><button class="pri" onclick="send()">送出</button></div>
+ </div>
+</div>
+<div class="card"><h2>② Agent 時間軸（Detect → Triage → Plan → Gate → Execute → Verify → Report）</h2><div id="tl" class="grow"></div></div>
+<div class="col">
+ <div class="card" style="flex:1"><h2>③ Operator 面板</h2><div id="op" class="grow"></div></div>
+ <div class="card" style="flex:1"><h2>④ 遠端工程師（mock）</h2><div id="eng" class="grow"></div></div>
+</div></main>
+<script>
+const $=id=>document.getElementById(id),J=(u,o)=>fetch(u,o).then(r=>r.json()),P=(u,b)=>J(u,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(b||{})});
+const T=t=>new Date(t*1000).toLocaleTimeString('zh-TW',{hour12:false});
+const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+let last=0,es;
+function addEv(e){last=Math.max(last,e.id);const d=document.createElement('div');d.className='ev '+e.type;
+ d.innerHTML=`<small>${T(e.ts)}${e.issue_id?' #'+e.issue_id:''} ${e.type}</small>${esc(e.text)}`;const tl=$('tl');tl.appendChild(d);tl.scrollTop=tl.scrollHeight;
+ if(e.type==='version'||e.type==='operator')loadVer();}
+async function boot(){$('tl').innerHTML='';last=0;(await J('/api/events?limit=60')).forEach(addEv);if(es)es.close();es=new EventSource('/api/stream?after='+last);es.onmessage=m=>addEv(JSON.parse(m.data));
+ const h=await J('/api/chat/history');$('chat').innerHTML='';h.forEach(m=>addMsg(m.role,m.content));loadVer();}
+function addMsg(r,t,sub){const d=document.createElement('div');d.className='msg '+r;d.innerHTML=(sub?`<small>${esc(sub)}</small>`:'')+esc(t);$('chat').appendChild(d);$('chat').scrollTop=1e9}
+async function send(){const t=$('q').value.trim();if(!t)return;$('q').value='';addMsg('user',t);const r=await P('/api/chat',{text:t});addMsg('assistant',r.answer,'tools: '+r.tools.join(' → ')+' · '+r.llm);}
+function tab(n){['chat','ver'].forEach(x=>{$(x).style.display=x===n?'block':'none';$('t-'+x).className=x===n?'on':''});$('chatbar').style.display=n==='chat'?'flex':'none'}
+async function loadVer(){const v=await J('/api/versions');$('ver').innerHTML=v.map((x,i)=>`<div class="ver" onclick="showDiff(${x.seq},${x.parent_seq||0})"><b>v${x.seq}</b> ${i===0?'<span class="badge">HEAD</span>':''} <span class="a">${x.actor} · ${T(x.ts)}</span><br>${esc(x.reason)}<div class="row"><button onclick="event.stopPropagation();rb(${x.seq})">rollback 到此版</button></div></div>`).join('')+'<pre id="diff" class="ev"></pre>'}
+async function showDiff(b,a){if(!a)return;const r=await J(`/api/versions/diff?a=${a}&b=${b}`);$('diff').textContent=r.summary}
+async function rb(s){await P('/api/versions/rollback',{to_seq:s})}
+async function fault(n){await P('/api/demo/fault/'+n)}
+async function reset(){await P('/api/demo/reset');boot()}
+async function resp(id,r){await P(`/api/escalations/${id}/respond`,{response:r});poll()}
+async function poll(){
+ try{const s=await J('/api/status');$('llm').textContent='LLM: '+s.llm;$('head').textContent='config v'+s.head;
+  $('lanes').innerHTML=Object.entries(s.lanes).map(([l,m])=>{const bad=!m.stream_connected||!m.fps,low=m.detections_per_min!=null&&m.detections_per_min<4;
+   return `<div class="lane"><span><span class="dot ${bad?'bad':low?'warn':''}"></span>Lane ${l}</span><span>fps ${m.fps??'-'} · 偵測 ${m.detections_per_min??'-'}/min · ${m.stream_connected?'連線':'中斷'}</span></div>`}).join('');
+  const e=await J('/api/escalations'),now=Date.now()/1000;
+  const op=e.filter(x=>x.to_who==='operator'),en=e.filter(x=>x.to_who==='engineer');
+  $('op').innerHTML=op.map(x=>`<div class="esc"><b>${x.kind==='confirm_rollback'?'🔁 確認 rollback':'🛠 請求現場協助'}</b>${x.deadline?` <span class="badge">${Math.max(0,Math.round(x.deadline-now))}s</span>`:''}<div>${esc(x.text)}</div><div class="row">${x.kind==='assist'?`<button class="pri" onclick="resp(${x.id},'fixed')">已處理</button><button class="dng" onclick="resp(${x.id},'cannot')">無法處理</button>`:`<button class="pri" onclick="resp(${x.id},'confirm')">確認 rollback</button><button onclick="resp(${x.id},'reject')">取消</button>`}</div></div>`).join('')||'<div class="empty">無待處理請求</div>';
+  $('eng').innerHTML=en.map(x=>{const p=x.payload;return `<div class="esc eng"><b>🚨 Incident #${x.issue_id}</b><div>${esc(x.text)}</div><pre>${esc(p.summary)}\n\n建議：${esc(p.suggestion)}\n已嘗試：${esc(p.actions.map(a=>a.tool+'('+a.status+')').join('、')||'無')}\n\n時間軸：\n${esc(p.timeline.join('\n'))}\n\nLogs：\n${esc(p.recent_logs.join('\n'))}</pre><div class="row"><button class="pri" onclick="resp(${x.id},'fixed')">工程師已修復</button></div></div>`}).join('')||'<div class="empty">無升級事件</div>';
+ }catch(e){}}
+boot();setInterval(poll,1500);poll();
+</script></body></html>

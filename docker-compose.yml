@@ -1,0 +1,27 @@
+services:
+  sim:
+    build: ./sim
+    environment:
+      AGENT_URL: http://agent:8000
+    ports: ["8001:8001"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 5s
+      retries: 10
+  agent:
+    build: ./agent
+    env_file: [.env]
+    environment:
+      SIM_URL: http://sim:8001
+      DB_PATH: /data/agent.db
+    ports: ["8000:8000"]
+    volumes: ["agent-data:/data"]
+    depends_on:
+      sim:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      retries: 10
+volumes:
+  agent-data:
