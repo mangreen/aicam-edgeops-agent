@@ -24,5 +24,5 @@ class AutoLLM:
 
     async def plan(self, ctx): return await self._run("plan", ctx)
     async def report(self, ctx): return await self._run("report", ctx)
-    async def chat_plan(self, t, h): return await self._run("chat_plan", t, h)
+    async def chat_plan(self, t, h, a=None): return await self._run("chat_plan", t, h, a)
     async def chat_answer(self, t, r): return await self._run("chat_answer", t, r)

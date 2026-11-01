@@ -1,4 +1,10 @@
+from dataclasses import replace
+
 import pytest
+
+
+def enable(d, **features):
+    d.s = replace(d.s, raw={"features": features})
 
 
 def test_ingest_validates_and_stores(client, d):
@@ -37,6 +43,30 @@ def test_status_versions_and_tools(client):
 
 
 def test_reset_is_idempotent(client, d):
+    enable(d, demo_controls=True)
     for _ in range(2):
         assert client.post("/api/demo/reset").status_code == 200
         assert d.versions.head()["seq"] == 6 and len(d.issues.list(50)) == 4
+
+
+def test_features_gate_returns_403_when_disabled(client, d):
+    d.s = replace(d.s, raw={"features": {"chat": False}})
+    assert client.post("/api/chat", json={"text": "狀態"}).status_code == 403
+    assert client.post("/api/demo/reset").status_code == 403                  # 預設關閉
+    assert client.post("/api/admin/reload").status_code == 403
+    assert client.get("/api/features").json()["chat"] is False
+
+
+def test_capabilities_reload_and_toggle(client, d, tmp_path):
+    cfg = tmp_path / "agent.toml"
+    cfg.write_text('[features]\nadmin_reload = true\ntool_toggle = true\n[tools]\nquery_traces = false\n')
+    d.s = replace(d.s, config_path=str(cfg), raw={"features": {"admin_reload": True, "tool_toggle": True}})
+    assert client.post("/api/admin/reload").status_code == 200
+    tools = {t["name"]: t for t in client.get("/api/capabilities").json()["tools"]}
+    assert tools["query_traces"]["enabled"] is False and tools["query_logs"]["enabled"] is True
+    assert client.put("/api/admin/tools/query_logs", json={"enabled": False}).status_code == 200
+    assert "query_logs" not in d.tools.names()
+    assert client.put("/api/admin/tools/nope", json={"enabled": True}).status_code == 404
+    cfg.write_text('[features]\nadmin_reload = true\n[tools]\ntypo_tool = false\n')
+    assert client.post("/api/admin/reload").status_code == 400                # 設定錯誤：維持原狀態
+    assert "query_logs" not in d.tools.names()

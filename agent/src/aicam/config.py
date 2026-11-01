@@ -8,6 +8,11 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+# 超出 Operator 權限的功能由設定檔 [features] 開關控制（POC 不實作 RBAC；使用者固定為 Operator）。
+# 預設只開聊天；其餘需在設定檔明確開啟。
+FEATURE_DEFAULTS = {"chat": True, "tool_toggle": False, "admin_reload": False, "prompt_edit": False,
+                    "llm_probe": False, "demo_controls": False}
+
 
 @dataclass(frozen=True)
 class DetectorCfg:
@@ -22,6 +27,8 @@ class DetectorCfg:
 class PolicyCfg:
     l1_max_per_10min: int = 2         # L1 動作頻率上限，防止重啟風暴
     rate_window_sec: float = 600.0
+    # Agent 自行 apply_config 時只能改這些設定路徑（fnmatch）；其他需 Operator 確認
+    agent_writable: tuple = ("lanes.*.decoder_profile", "lanes.*.fps_threshold")
 
 
 @dataclass(frozen=True)
@@ -36,6 +43,9 @@ class Settings:
     policy: PolicyCfg = field(default_factory=PolicyCfg)
     raw: dict = field(default_factory=dict)   # 完整 TOML，供 plugins / guards / rbac 解析
     config_path: str = ""
+
+    def feature(self, name: str) -> bool:
+        return bool(self.raw.get("features", {}).get(name, FEATURE_DEFAULTS[name]))
 
     def section(self, name: str) -> dict:
         return self.raw.get(name, {})
@@ -62,7 +72,7 @@ def load_settings(path: str | None = None, env=None) -> Settings:
         detect_samples=int(rt.get("detect_samples", 3)),
         lanes=tuple(rt.get("lanes", (1, 2))),
         detector=DetectorCfg(**raw.get("detector", {})),
-        policy=PolicyCfg(**raw.get("policy", {})),
+        policy=PolicyCfg(**{**raw.get("policy", {}), **({"agent_writable": tuple(raw["policy"]["agent_writable"])} if "agent_writable" in raw.get("policy", {}) else {})}),
         raw=raw, config_path=path,
     )
     return s

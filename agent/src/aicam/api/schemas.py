@@ -43,5 +43,9 @@ class RespondBody(BaseModel):
     response: Literal["fixed", "cannot", "confirm", "reject"]
 
 
+class ToggleBody(BaseModel):
+    enabled: bool
+
+
 class RollbackBody(BaseModel):
     to_seq: int | None = Field(default=None, ge=1)

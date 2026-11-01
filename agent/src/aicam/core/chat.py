@@ -1,18 +1,18 @@
 import json
 
-from aicam.core.constants import CHAT_TOOLS
-from aicam.plugins.tools import Call, execute
+from aicam.core.executor import Call, execute
 
 
 async def handle(d, text, session="default"):
     hist = d.issues.msgs(session, 10)
+    allowed = d.tools.names(chat=True)          # 只有 manifest 標示可對話呼叫且已啟用的工具
     try:
-        calls = await d.llm.chat_plan(text, hist)
+        calls = await d.llm.chat_plan(text, hist, allowed)
     except Exception:
-        calls = await d.llm.mock.chat_plan(text, hist)
+        calls = await d.llm.mock.chat_plan(text, hist, allowed)
     results, used = [], []
     for c in calls[:3]:
-        if c["tool"] not in CHAT_TOOLS:
+        if c["tool"] not in allowed:
             continue
         r = await execute(d, c["tool"], c.get("args") or {}, Call(origin="chat", actor="operator"))
         results.append({"tool": c["tool"], **{k: v for k, v in r.items() if k in ("summary", "ok")}})

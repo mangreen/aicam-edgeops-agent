@@ -1,7 +1,7 @@
 import pytest
 
 from aicam.core import versions as V
-from aicam.plugins.tools import Call, execute
+from aicam.core.executor import Call, execute
 
 
 async def test_apply_config_snapshots_and_pushes(d):
