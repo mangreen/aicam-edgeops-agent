@@ -125,7 +125,10 @@ issue 狀態：`detected → triaging → acting → verifying → resolved`；�
 ## 8.1 LLM 容錯（雲端模型的輸出不可靠）
 - **prompt 帶完整工具 schema**（參數、型別、必填），不只給名稱，避免模型猜參數。
 - **參數校正在 executor 統一處理**（`plugins/registry.normalize_args`）：別名（`lane_id→lane`、`duration→since_hours`）、轉型（`"1"→1`、`"2d"→48` 小時）；唯讀工具丟棄未知參數，動作類工具仍拒絕。校正不放寬權限，Policy Gate 照常判定，並在時間軸記錄「參數已校正」。
-- **回應解析容忍常見變體**：`arguments`／`parameters`、單一物件、code fence、JSON 字串參數；答案若是工具呼叫 JSON，改用工具結果摘要。
+- **回應解析容忍常見變體**：`arguments`／`parameters`、單一物件、`{"calls":[…]}`、code fence、JSON 字串參數；答案若是工具呼叫 JSON，改用工具結果摘要。
+- **JSON 擷取不貪婪**：逐個 `[`／`{` 位置 `raw_decode`，取第一個「符合預期」的值，所以前後的說明文字、`[1]`、`[搜尋歷史]` 之類的括號都不會讓解析失敗。
+- **JSON 任務的可靠度**：`temperature=0`、`response_format=json_object`（供應商回 400/404/422 就自動降級並記住）；prompt 加入 few-shot（只含已啟用工具）與「不需要工具回 `{"calls":[]}`」；第一次無法解析時，附上原因與原回覆片段**自動重問一次**，仍失敗才退回 Mock。
+- **退回 Mock 時仍要答對**：Mock 的意圖規則容忍錯字（「聊果」「剛剛問了什麼」）；`search_history` 沒有關鍵字或搜不到時，改列出最近的對話。
 - **對話最多一次「附錯誤訊息的重新規劃」**，不會無限重試。
 - **退回策略分兩類**：格式錯誤只讓「這一次」改用 Mock；連線錯誤才鎖雲端 30 秒。`info()` 回報 `last_error`，UI 徽章顯示退回原因。
 - **Reset 依 `.env` 重建 provider**，立即解除退回狀態（`Runtime.reset_llm`）。

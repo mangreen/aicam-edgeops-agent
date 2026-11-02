@@ -42,6 +42,7 @@ Host 只需 Docker Desktop 與瀏覽器。（macOS 內建的 `pip`／`python` �
 | `重載設定檔` 回 400 | 設定有誤（未知工具／guard 名稱、未安裝的 MCP adapter、TOML 語法）；訊息已說明，原設定仍生效 |
 | 對話／按鈕回 403 | 對應 `[features]` 為 false，這是設計行為 |
 | 標頭顯示 MOCK | 滑鼠移到徽章看原因（沒金鑰／離線／雲端失敗）；改好 `.env` 後按 Reset 即恢復。連線類錯誤會鎖定雲端 30 秒，Reset 可立即解除 |
+| 事件出現「雲端 LLM 回應格式不符…本次改用 Mock」 | 已自動重問一次仍失敗；訊息內含模型原始回覆片段，用來判斷是模型太弱（換 `OPENROUTER_MODEL`）還是 prompt 問題。UI 徽章 tooltip 與 `llm_info.format_errors` 可看累計次數。單次格式錯誤不會鎖定雲端 |
 | 雲端模型常回「參數驗證失敗」 | 已內建參數校正（lane_id→lane、"2d"→48 小時）與一次附錯誤訊息的重新規劃；仍失敗時事件時間軸會有 `參數已校正`／`policy` 紀錄可查原因，必要時換更強的模型（`OPENROUTER_MODEL`） |
 | 場景 A 後同一車道又立刻出現 issue | 檢查 `[detector]` 設定；正常情況下結案後只看新樣本 |
 | `make test` 失敗找不到 Docker | 啟動 Docker Desktop；本專案不需要 Host Python |
