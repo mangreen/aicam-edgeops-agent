@@ -14,7 +14,8 @@ open http://localhost:8000
 make test      # 在 Docker 內跑 pytest（不需要 Host Python）
 ```
 有網路想用真模型：編輯 `.env` → `LLM_PROVIDER=auto` 並填一組 API key → `make up`。
-UI 標頭會如實顯示 `REAL · provider/model` 或 `MOCK`。離線攜帶：`make pack` → 離線機 `make load && make up-offline`。
+UI 標頭會如實顯示 `REAL · provider/model` 或 `MOCK`（雲端失敗退回時顯示 `MOCK（… 失敗，已退回）`，游標移上去可看原因）。
+**改了 `.env` 或雲端曾失敗退回 Mock：按 UI 的 Reset（或 🛡安全 →「重新載入 LLM」）即可依 `.env` 重建，不必 `make down`／`make up`。**離線攜帶：`make pack` → 離線機 `make load && make up-offline`。
 
 ## 情境
 | | 情境 | 展示 |

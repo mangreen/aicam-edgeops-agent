@@ -11,9 +11,12 @@
 | `AICAM_CONFIG` | 設定檔路徑 | 容器 `/app/config/agent.toml` |
 | `DB_PATH` / `SIM_URL` | SQLite 路徑／邊緣控制 API | `/data/agent.db`／`http://sim:8001` |
 | `VERIFY_WAIT` / `OPERATOR_TIMEOUT` | 覆寫 `[runtime]` 同名鍵 | 7／30 秒 |
+| `AICAM_ENV_FILE` | Reset 時讀取的 `.env` 路徑（compose 已將 `./.env` 唯讀掛到 `/app/.env`） | `/app/.env` |
 | `LLM_PROVIDER` | `mock`｜`auto`｜`anthropic`｜`openai`｜`openrouter` | `mock`（`.env.example`） |
 | `ANTHROPIC_API_KEY` `OPENAI_API_KEY` `OPENROUTER_API_KEY` | 雲端 LLM 金鑰（只放 `.env`） | 空 |
 | `ANTHROPIC_MODEL` `OPENAI_MODEL` `OPENROUTER_MODEL` `OPENAI_BASE_URL` | 模型名稱／相容端點 | 見 `.env.example` |
+
+**LLM 相關變數（`LLM_PROVIDER`、各 API key／model、`OPENAI_BASE_URL`）可在不重啟下生效：按 UI Reset 會重新讀取 `.env`，且 `.env` 的值優先於容器建立時的環境變數。**
 
 `auto`：有金鑰且該服務可連線才使用雲端，否則 Mock；執行中雲端失敗會退回 Mock，30 秒內不再重試。
 

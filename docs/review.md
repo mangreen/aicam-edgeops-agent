@@ -50,3 +50,12 @@
 - `query_logs` 原摘要只含筆數，對查詢不實用且讓 log 內容繞過 guard 流程 → 改為附最近訊息並經 content／output guard。
 - `search_history` 原本會搜到 Agent 自己的工具輸出 → 改為只比對使用者提問並附上對應回答。
 - 開發過程曾因行程未清除而讀到舊程式碼的測試結果；之後以乾淨 worktree 逐 commit 驗證。
+
+## v0.2.1 實機回饋與修正（使用者以 OpenRouter 實測）
+| 問題 | 根因 | 修正 |
+|---|---|---|
+| 對話一按 Enter 就送出，中文輸入法選字時誤送 | UI 綁了 Enter 事件 | 只有按「送出」才送出；處理中停用按鈕並顯示 spinner |
+| 查「lane 1 過去 2 天 metrics」失敗：`lane_id`／`duration`、「缺少必要參數 lane」，答案是一段工具呼叫 JSON | `chat_plan` 的 prompt 只有工具**名稱**沒有參數 schema，模型只能猜；回答階段又把答案寫成工具呼叫 | prompt 帶完整 schema；executor 參數校正；解析容忍變體；答案為工具呼叫 JSON 時改用結果摘要；一次附錯誤的重新規劃 |
+| 格式錯誤也被當成雲端故障，鎖 30 秒 | `AutoLLM` 不分錯誤類型 | 格式錯誤只影響單次；連線錯誤才鎖定 |
+| 退回 Mock 後只能 `make down && make up` | 容器環境變數建立時固定；Reset 不重建 LLM | `.env` 唯讀掛載 + `Runtime.reset_llm`；Reset／「重新載入 LLM」依 `.env` 重建 |
+| 看到 MOCK 卻不知道為什麼 | 沒有原因資訊 | 徽章顯示退回狀態，tooltip 為 `last_error`；`make_llm` 會說明為何使用 Mock |

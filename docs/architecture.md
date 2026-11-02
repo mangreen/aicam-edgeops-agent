@@ -122,6 +122,14 @@ issue 狀態：`detected → triaging → acting → verifying → resolved`；�
 - **功能開關取代 RBAC**：POC 使用者固定為 Operator；聊天、改 prompt、重載設定、工具啟停、LLM 連線測試、demo 控制由 `[features]` 控制，關閉時 API 回 403、UI 隱藏。
 - **分層防線**：prompt 讓真實 LLM 拒絕；guard、Policy Gate、功能開關由程式碼強制，不依賴 LLM 聽話。Mock 不解讀 prompt，UI 與連線測試會如實標示 `MOCK`。
 
+## 8.1 LLM 容錯（雲端模型的輸出不可靠）
+- **prompt 帶完整工具 schema**（參數、型別、必填），不只給名稱，避免模型猜參數。
+- **參數校正在 executor 統一處理**（`plugins/registry.normalize_args`）：別名（`lane_id→lane`、`duration→since_hours`）、轉型（`"1"→1`、`"2d"→48` 小時）；唯讀工具丟棄未知參數，動作類工具仍拒絕。校正不放寬權限，Policy Gate 照常判定，並在時間軸記錄「參數已校正」。
+- **回應解析容忍常見變體**：`arguments`／`parameters`、單一物件、code fence、JSON 字串參數；答案若是工具呼叫 JSON，改用工具結果摘要。
+- **對話最多一次「附錯誤訊息的重新規劃」**，不會無限重試。
+- **退回策略分兩類**：格式錯誤只讓「這一次」改用 Mock；連線錯誤才鎖雲端 30 秒。`info()` 回報 `last_error`，UI 徽章顯示退回原因。
+- **Reset 依 `.env` 重建 provider**，立即解除退回狀態（`Runtime.reset_llm`）。
+
 ## 9. 資料表
 
 `logs`、`metrics`、`spans`、`issues`、`events`（時間軸，type：detect／triage／plan／policy／tool／verify／escalate／operator／engineer／report／version／guard／config／prompt／llm／error）、`actions`、`escalations`、`messages`、`versions`、`outbox`、`prompt_layers`、`prompt_history`、`kb`（FTS5）。

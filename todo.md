@@ -1,9 +1,10 @@
 # todo.md
 
 ## 需在有 Docker／金鑰的環境完成的驗證（開發環境無法執行）
-- [ ] `make up`、`make test`、`make lint`、`make pack`/`load`/`up-offline`：Docker Desktop 4.12 / Compose v2.10.2 實跑（含 `read_only: true`、`tmpfs`、`mem_limit`、bind mount 唯讀 config）
+- [x] `make test`、`make lint`：使用者在 Docker Desktop 實跑通過（108 項／ruff；之後已增至 142 項，需重跑）；`make up` 與以 OpenRouter 對話已由使用者實際使用
+- [ ] `make pack`/`load`/`up-offline`、`.env` 單檔 bind mount 在 macOS 的更新行為（編輯器換檔時可能看到舊內容，需 `docker compose restart agent`）、Compose v2.10.2 對 `read_only`／`tmpfs`／`mem_limit` 的長時間運行
 - [ ] 斷網演練 + 錄製備援影片
-- [ ] 雲端 LLM 實測（`LLM_PROVIDER=auto` 與金鑰）：plan／report／chat 的 JSON 格式、`REAL` 徽章、prompt 層對真 LLM 的效果；視結果微調 `anthropic`／`openrouter` 預設模型名稱
+- [ ] 雲端 LLM 實測（已用 OpenRouter 發現參數與格式問題並修正，見 review）：plan／report 的 JSON 格式、prompt 層對真 LLM 的效果、不同模型的容錯差異；視結果微調預設模型名稱
 - [ ] GitHub Actions CI 首次執行
 - [ ] UI 在真實瀏覽器的視覺檢查（開發環境僅做 JS 語法檢查與 API 測試）
 

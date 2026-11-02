@@ -23,7 +23,9 @@ Host 只需 Docker Desktop 與瀏覽器。（macOS 內建的 `pip`／`python` �
 
 ## 修改設定
 - 設定檔 `config/agent.toml` 以唯讀 bind mount 掛入容器，直接用編輯器修改，再於 UI ⚙能力 按「重載設定檔」。欄位說明見 `docs/config-reference.md`。
-- 改 `.env`（LLM provider／金鑰）後需 `make up` 重新建立容器。
+- 改 `.env`（LLM provider／金鑰）：`.env` 以唯讀掛入容器，按 UI **Reset**（或 🛡安全 →「重新載入 LLM」，或 `POST /api/llm/reset`）即依 `.env` 重建 LLM，**不必重啟容器**；`.env` 的值優先於容器建立時的環境變數。
+  - 若編輯器以「換檔」方式存檔（部分 vim 設定）導致容器仍看到舊內容：`docker compose restart agent`。
+  - 其他非 LLM 的環境變數（`DB_PATH`、`SIM_URL`…）仍需 `make up` 重新建立容器。
 - 切換 LLM：`LLM_PROVIDER=mock`（離線）｜`auto`（有金鑰且可連線則用雲端，失敗自動退回 Mock）｜`anthropic`｜`openai`｜`openrouter`。
 
 ## 新增能力
@@ -38,7 +40,8 @@ Host 只需 Docker Desktop 與瀏覽器。（macOS 內建的 `pip`／`python` �
 | UI 載入但沒有資料 | sim 尚未就緒：`docker compose ps`、`make logs`；agent 會重試推送設定 |
 | `重載設定檔` 回 400 | 設定有誤（未知工具／guard 名稱、未安裝的 MCP adapter、TOML 語法）；訊息已說明，原設定仍生效 |
 | 對話／按鈕回 403 | 對應 `[features]` 為 false，這是設計行為 |
-| 標頭顯示 MOCK | 沒金鑰／離線／雲端失敗而退回；🛡安全 的連線測試會顯示是否為 fallback |
+| 標頭顯示 MOCK | 滑鼠移到徽章看原因（沒金鑰／離線／雲端失敗）；改好 `.env` 後按 Reset 即恢復。連線類錯誤會鎖定雲端 30 秒，Reset 可立即解除 |
+| 雲端模型常回「參數驗證失敗」 | 已內建參數校正（lane_id→lane、"2d"→48 小時）與一次附錯誤訊息的重新規劃；仍失敗時事件時間軸會有 `參數已校正`／`policy` 紀錄可查原因，必要時換更強的模型（`OPENROUTER_MODEL`） |
 | 場景 A 後同一車道又立刻出現 issue | 檢查 `[detector]` 設定；正常情況下結案後只看新樣本 |
 | `make test` 失敗找不到 Docker | 啟動 Docker Desktop；本專案不需要 Host Python |
 
