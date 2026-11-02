@@ -3,8 +3,9 @@ import os
 from dataclasses import dataclass, field
 
 from aicam.adapters.guards import build_pipeline
+from aicam.adapters.llm import make_llm
 from aicam.adapters.sqlite import DB, FtsKnowledge, OutboxNotifier, SqliteIssues, SqliteObs, SqliteVersions
-from aicam.config import Settings, load_settings
+from aicam.config import Settings, load_dotenv, load_settings
 from aicam.plugins.loader import build_registry
 from aicam.plugins.skills import load_skills
 from aicam.prompts import PromptStore
@@ -35,6 +36,21 @@ class Runtime:
         """掛上 LLM，並讓它從 PromptStore 取得目前生效的 system prompt。"""
         self.llm = llm
         llm.set_prompt_source(lambda scope: self.prompts.compose(scope))
+
+    def reset_llm(self, env_file: str | None = None) -> dict:
+        """依 .env（優先）與容器環境變數重建 LLM provider，並清除退回 Mock 的狀態。
+
+        用於 Reset：雲端曾失敗而退回 Mock、或使用者剛改了 .env 的 provider／金鑰，都不必重啟容器。
+        """
+        path = env_file if env_file is not None else os.environ.get("AICAM_ENV_FILE", "/app/.env")
+        file_env = load_dotenv(path)
+        llm = make_llm(lambda m: self.issues.event(None, "llm", m), {**os.environ, **file_env})
+        self.attach_llm(llm)
+        info = llm.info()
+        src = ".env" if file_env else "容器環境變數（找不到 .env）"
+        self.issues.event(None, "llm", f"LLM 已重新載入：{info['configured']}/{info['model']}（來源：{src}）"
+                          + (f"；{llm.last_error}" if llm.last_error else ""))
+        return {**info, "source": src}
 
     def rebuild_plugins(self):
         self.tools = build_registry(self.s, self.overrides)

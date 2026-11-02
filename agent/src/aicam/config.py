@@ -79,3 +79,26 @@ def load_settings(path: str | None = None, env=None) -> Settings:
         raw=raw, config_path=path,
     )
     return s
+
+
+def load_dotenv(path: str) -> dict:
+    """讀取 .env（KEY=VALUE；支援 # 註解與引號）。檔案不存在回 {}。
+
+    容器的環境變數在建立時就固定；.env 以唯讀掛入容器，讓 Reset 能在不重啟的情況下重新讀取 LLM 設定。
+    """
+    p = Path(path) if path else None
+    if not p or not p.is_file():
+        return {}
+    out = {}
+    for line in p.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        v = v.strip()
+        if v[:1] in "\"'" and v[-1:] == v[:1] and len(v) >= 2:
+            v = v[1:-1]
+        elif " #" in v:
+            v = v.split(" #", 1)[0].strip()
+        out[k.strip().removeprefix("export ").strip()] = v
+    return out

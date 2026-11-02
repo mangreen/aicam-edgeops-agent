@@ -177,7 +177,14 @@ async def reset(request: Request):
     seed.run(d, force=True)
     await d.edge.reset()
     await d.edge.push_config(d.versions.head()["content"])
-    return {"ok": True}
+    llm = await asyncio.to_thread(d.reset_llm)      # 依 .env 重新建立 LLM，並清除退回 Mock 的狀態
+    return {"ok": True, "llm": llm}
+
+
+@router.post("/api/llm/reset", dependencies=[feature("llm_probe")])
+async def llm_reset(request: Request):
+    """只重新載入 LLM（依 .env），不動 demo 資料。"""
+    return await asyncio.to_thread(rt(request).reset_llm)
 
 
 @router.get("/api/features")

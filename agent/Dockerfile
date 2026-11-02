@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 WORKDIR /app
-ENV PYTHONPATH=/app/src PYTHONUNBUFFERED=1 AICAM_CONFIG=/app/config/agent.toml
+ENV PYTHONPATH=/app/src PYTHONUNBUFFERED=1 AICAM_CONFIG=/app/config/agent.toml AICAM_ENV_FILE=/app/.env
 COPY agent/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
  && useradd -r -u 10001 app && mkdir /data && chown app /data
