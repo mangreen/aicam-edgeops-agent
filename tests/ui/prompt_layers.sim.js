@@ -40,7 +40,7 @@ const A=ctx.__api;let fails=0;const ok=(c,m)=>{if(!c)fails++;console.log((c?'PAS
  ok(!log.some(l=>l[0]==='fetch'&&l[1]==='DELETE'),'取消確認 → 不刪除');
  ctx._confirm=true; ctx._delOk=false; log.length=0; await A.delLayer(2);
  ok(log.some(l=>l[0]==='alert'),'後端 404 → 顯示錯誤訊息');
- ctx._confirm=true; ctx._confirm=true; log.length=0; await A.delLayer(2); 
+ ctx._confirm=true; log.length=0; await A.delLayer(2);
  const c=log.filter(l=>l[0]==='confirm')[0]; ok(c&&c[1].includes('恢復同名的檔案層'),'覆蓋層的確認訊息提到會恢復檔案層');
  ctx._prompts.editable=false; await A.loadSec(); ok(!els.sec.innerHTML.includes('delLayer('),'prompt_edit 關閉 → 唯讀，沒有刪除／編輯鈕');
 process.exitCode=fails?1:0;
