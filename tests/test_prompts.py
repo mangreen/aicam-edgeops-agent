@@ -60,3 +60,12 @@ async def test_cloud_llm_receives_composed_prompt(d):
     assert ans == "我是 fake-cloud" and "只允許 Operator 查詢" in seen["system"] and "aicam-edgeopt-agent" in seen["system"]
     info = d.llm.info()
     assert (info["provider"], info["model"], info["real"], info["fallback_active"]) == ("fake-cloud", "m1", True, False)
+
+
+def test_delete_ui_layer_only(d):
+    d.prompts.upsert("tmp-layer", "x", scope="chat")
+    assert d.prompts.delete("tmp-layer") is True
+    assert all(x["name"] != "tmp-layer" for x in d.prompts.layers())
+    assert d.prompts.delete("tmp-layer") is False             # 已不存在
+    assert d.prompts.delete("chat-style") is False            # 只存在於檔案層：不可由 UI 刪除
+    assert any(x["name"] == "chat-style" and x["source"] == "file" for x in d.prompts.layers())

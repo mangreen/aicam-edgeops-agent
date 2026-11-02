@@ -59,6 +59,8 @@
 ## `[prompts]` 與 prompt 檔
 檔案層：`config/prompts/*.md`，frontmatter：`name`、`scope`（`agent｜chat｜all`）、`priority`（小者在前）、`enabled`（預設 true）。
 UI 層存於資料庫，同名時覆蓋檔案層；刪除 UI 層即恢復檔案層。`Reset` 會清除 UI 層。
+UI（🛡安全 → Prompt 層）：每個 UI 層都有「編輯」「刪除」（刪除前會確認）；檔案層只有「編輯」（儲存後建立同名 UI 覆蓋層，原檔不變），不能由 UI 刪除。按「編輯」會自動捲到編輯區並聚焦。
+API：`DELETE /api/prompts/{name}` 找不到 UI 層（含只存在於檔案層）回 404；需 `features.prompt_edit = true`。
 
 ## `[guards]`
 ```toml

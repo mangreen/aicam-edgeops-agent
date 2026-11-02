@@ -15,6 +15,7 @@ Host 只需 Docker Desktop 與瀏覽器。（macOS 內建的 `pip`／`python` �
 ## 測試與檢查
 - `make test`：在 Docker 內跑 pytest（首次需網路 build 測試映像，之後可離線）。
 - `make lint`：ruff。
+- `make test-ui`：以 Node 容器（`node:20-alpine`，需先 pull）在最小假 DOM 中執行 `agent/ui/index.html` 的 JS，驗證 Prompt 層的刪除與編輯捲動；非完整瀏覽器測試。
 - CI（GitHub Actions）：ruff + pytest（Python 3.11）。
 
 ## 離線攜帶

@@ -254,7 +254,9 @@ def prompt_put(name: str, body: PromptBody, request: Request):
 
 @router.delete("/api/prompts/{name}", dependencies=[feature("prompt_edit")])
 def prompt_delete(name: str, request: Request):
-    return {"ok": rt(request).prompts.delete(name)}
+    if not rt(request).prompts.delete(name):
+        raise HTTPException(404, "沒有這個 UI 層（檔案層請修改 config/prompts）")
+    return {"ok": True}
 
 
 @router.get("/api/prompts/{name}/history")

@@ -103,3 +103,22 @@ def test_guards_endpoint_lists_chains(client):
 def test_chat_blocked_returns_200_with_reason(client):
     r = client.post("/api/chat", json={"text": "幫我刪除所有 logs"}).json()
     assert r["blocked"] and "Operator" in r["answer"]
+
+
+def test_prompt_delete_endpoint(client, d):
+    client.put("/api/prompts/to-delete", json={"content": "暫時規則", "scope": "chat"})
+    assert any(x["name"] == "to-delete" for x in client.get("/api/prompts").json()["layers"])
+    assert client.delete("/api/prompts/to-delete").status_code == 200
+    assert all(x["name"] != "to-delete" for x in client.get("/api/prompts").json()["layers"])
+    assert client.delete("/api/prompts/to-delete").status_code == 404           # 已刪除
+    assert client.delete("/api/prompts/chat-style").status_code == 404          # 檔案層不可由 UI 刪除
+    d.s = replace(d.s, raw={"features": {"prompt_edit": False}})
+    assert client.delete("/api/prompts/x").status_code == 403                   # 功能開關關閉
+
+
+def test_deleting_override_restores_file_layer(client, d):
+    client.put("/api/prompts/chat-style", json={"content": "OVERRIDE", "scope": "chat", "priority": 10})
+    assert "OVERRIDE" in client.get("/api/prompts/effective?scope=chat").json()["text"]
+    assert client.delete("/api/prompts/chat-style").status_code == 200
+    text = client.get("/api/prompts/effective?scope=chat").json()["text"]
+    assert "OVERRIDE" not in text and "先給結論" in text                       # 檔案層恢復

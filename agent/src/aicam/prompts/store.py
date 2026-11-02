@@ -67,6 +67,9 @@ class PromptStore:
         return {"name": name, "scope": scope, "priority": priority, "enabled": enabled}
 
     def delete(self, name: str) -> bool:
+        """刪除 UI 層；回傳 False 表示沒有這個 UI 層（例如只存在於檔案層，檔案層請改 config/prompts）。"""
+        if not self.rt.db.q("SELECT 1 FROM prompt_layers WHERE name=?", (name,)):
+            return False
         self.rt.db.x("DELETE FROM prompt_layers WHERE name=?", (name,))
         self.rt.db.x("INSERT INTO prompt_history(name,scope,priority,enabled,content,ts,note) VALUES(?,?,?,?,?,?,?)",
                      (name, "", 0, 0, "", time.time(), "delete"))

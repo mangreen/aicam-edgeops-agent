@@ -10,7 +10,7 @@ POC：地端 Agent 自動排除 AI 攝影機系統故障（Agent → Operator �
 - 程式：`agent/src/aicam/`（core／ports／adapters／plugins／prompts／api／poc）、`sim/app.py`（POC 模擬器）、`config/`、`tests/`
 
 ## 指令（Host 只需 Docker；不要用 Host 的 pip/python）
-`make up | up-offline | down | reset | logs | test | lint | pack | load | fault-A | fault-B | fault-E`
+`make up | up-offline | down | reset | logs | test | test-ui | lint | pack | load | fault-A | fault-B | fault-E`
 
 ## 規則
 1. 依賴方向：`api → core → ports ← adapters`；`core` 不得 import `adapters`。新外部依賴先定義 Port。
