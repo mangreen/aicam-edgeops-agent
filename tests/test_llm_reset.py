@@ -27,7 +27,7 @@ def test_reset_llm_reads_env_file_and_clears_fallback(d, tmp_path, monkeypatch):
     class Broken(CloudLLM):
         name, model = "broken", "x"
 
-        async def _complete(self, s, u): raise ConnectionError("offline")
+        async def _complete(self, s, u, json_mode=False): raise ConnectionError("offline")
     d.attach_llm(AutoLLM(Broken()))
     import asyncio
     asyncio.run(d.llm.converse("hi"))

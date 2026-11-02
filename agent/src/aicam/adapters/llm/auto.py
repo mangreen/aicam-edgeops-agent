@@ -20,6 +20,7 @@ class AutoLLM:
     def __init__(self, cloud=None, mock=None, on_fallback=None):
         self.cloud, self.mock, self.on_fallback = cloud, mock or MockLLM(), on_fallback
         self.name, self._down_until, self.last_error = (cloud.name if cloud else "mock"), 0, ""
+        self.format_errors = 0                       # 累計「回應格式不符」次數（已含一次自動重問）
 
     async def _run(self, fn, *a, **kw):
         if self.cloud and time.time() >= self._down_until:
@@ -30,7 +31,8 @@ class AutoLLM:
             except Exception as e:
                 self.last_error = f"{type(e).__name__}: {str(e)[:100]}"
                 if isinstance(e, FORMAT_ERRORS):
-                    msg = f"雲端 LLM 回應格式不符（{self.last_error}），本次改用 Mock"
+                    self.format_errors += 1
+                    msg = f"雲端 LLM 回應格式不符（已自動重問一次仍失敗：{self.last_error}），本次改用 Mock"
                 else:
                     self._down_until = time.time() + COOLDOWN_S
                     msg = f"雲端 LLM 不可用（{self.last_error}），{COOLDOWN_S} 秒內退回 Mock；Reset 可立即重試"
@@ -48,7 +50,7 @@ class AutoLLM:
         """最近一次實際回應者；尚未呼叫前以設定的 provider 為準。"""
         base = self.cloud.info() if self.cloud and self.name != "mock" else self.mock.info()
         return base | {"fallback_active": bool(self.cloud) and self.name == "mock", "last_error": self.last_error,
-                       "configured": self.cloud.name if self.cloud else "mock"}
+                       "configured": self.cloud.name if self.cloud else "mock", "format_errors": self.format_errors}
 
     async def converse(self, text): return await self._run("converse", text)
     async def plan(self, ctx): return await self._run("plan", ctx)

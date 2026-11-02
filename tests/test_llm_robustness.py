@@ -64,7 +64,7 @@ class Scripted(CloudLLM):
     def __init__(self, replies):
         self.replies, self.systems = list(replies), []
 
-    async def _complete(self, system, user):
+    async def _complete(self, system, user, json_mode=False):
         self.systems.append((system, user))
         r = self.replies.pop(0)
         if isinstance(r, Exception):
@@ -113,11 +113,11 @@ async def test_report_that_is_a_tool_call_falls_back(d):
 
 
 async def test_format_error_falls_back_once_and_does_not_lock_cloud(d):
-    llm = Scripted(["not json at all", '[{"tool":"query_metrics","args":{"lane":1}}]'])
+    llm = Scripted(["not json at all", "still not json", '[{"tool":"query_metrics","args":{"lane":1}}]'])   # 第一次：原回覆 + 重問皆失敗
     notes = []
     auto = AutoLLM(llm, on_fallback=notes.append)
     first = await auto.chat_plan("查 metrics", [], tools_for(d, "query_metrics"))
-    assert auto.name == "mock" and notes and "格式不符" in notes[0] and first                 # 這次用 Mock
+    assert auto.name == "mock" and notes and "格式不符" in notes[0] and "重問" in notes[0] and first   # 這次用 Mock
     second = await auto.chat_plan("查 metrics", [], tools_for(d, "query_metrics"))
     assert auto.name == "scripted" and second[0]["tool"] == "query_metrics"                   # 下一次回到雲端
 

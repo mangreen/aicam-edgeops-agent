@@ -51,7 +51,7 @@ async def test_cloud_llm_receives_composed_prompt(d):
     class Cloud(CloudLLM):
         name, model = "fake-cloud", "m1"
 
-        async def _complete(self, system, user):
+        async def _complete(self, system, user, json_mode=False):
             seen["system"] = system
             return "我是 fake-cloud"
     d.prompts.upsert("operator-scope", "只允許 Operator 查詢。", scope="chat")

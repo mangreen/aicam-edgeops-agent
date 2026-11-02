@@ -21,10 +21,15 @@ async def search_issues(d, c, kind=None, lane=None):
         f"#{r['id']} {_ago(r['created'])} Lane {r['lane']} {r['kind']} → {r['summary']}" for r in rows) or "無歷史 issue"}
 
 
-@box.tool("search_history", "搜尋歷史對話", {"query": _str("關鍵字")}, ("query",), level="L0", chat=True)
-async def search_history(d, c, query):
-    rows = d.issues.msg_search(query)
-    return {"rows": rows, "summary": "；".join(f"[{_ago(r['ts'])}] 問：{r['q'][:40]} 答：{(r['a'] or '')[:70]}" for r in rows) or "無相關歷史對話"}
+@box.tool("search_history", "搜尋歷史對話（query 可省略：列出最近的對話；搜不到時也會列出最近的對話）", {"query": _str("關鍵字，可省略")}, (), level="L0", chat=True)
+async def search_history(d, c, query=None):
+    q = (query or "").strip()
+    rows, note = (d.issues.msg_search(q) if q else []), ""
+    if not rows:
+        rows = d.issues.msg_recent()
+        note = f"沒有符合「{q}」的對話，以下是最近的對話：" if q else "最近的對話："
+    return {"rows": rows, "summary": (note + "；".join(f"[{_ago(r['ts'])}] 問：{r['q'][:40]} 答：{(r['a'] or '')[:70]}" for r in rows))
+            if rows else "目前沒有歷史對話"}
 
 
 TOOLS = box.tools

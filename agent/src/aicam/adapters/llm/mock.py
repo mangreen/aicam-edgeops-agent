@@ -46,8 +46,8 @@ class MockLLM:
             return [{"tool": "diff_versions", "args": {}}, {"tool": "propose_rollback", "args": {}}]
         if vm:
             return [{"tool": "diff_versions", "args": {"a": int(vm.group(1)), "b": int(vm.group(2))}}]
-        if re.search(r"聊過|之前問|歷史對話|上次問", t):
-            return [{"tool": "search_history", "args": {"query": f"Lane {lane}" if lane else text[:10]}}]
+        if re.search(r"聊(過|果|了|到)|聊天|之前(聊|問|說|談|討論)|歷史對話|對話紀錄|上次問|剛(剛|才)(問|聊)|前面(問|聊)", t):
+            return [{"tool": "search_history", "args": {"query": f"Lane {lane}" if lane else ""}}]
         if re.search(r"類似|上次|怎麼解|歷史|issue", t):
             kind = ("camera_no_signal" if re.search(r"斷線|無訊號|攝影機|camera", t) else
                     "detection_drop" if re.search(r"偵測|roi", t) else

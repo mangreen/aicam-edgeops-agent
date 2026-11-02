@@ -105,7 +105,7 @@ async def test_autollm_cooldown_after_failure():
     class Broken(CloudLLM):
         name, model = "broken", "x"
 
-        async def _complete(self, s, u):
+        async def _complete(self, s, u, json_mode=False):
             calls.append(1)
             raise ConnectionError("offline")
     notes = []

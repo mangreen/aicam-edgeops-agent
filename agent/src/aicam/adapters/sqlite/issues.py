@@ -76,6 +76,12 @@ class SqliteIssues:
         return list(reversed(self.db.q("SELECT role,content,ts FROM messages WHERE session=? "
                                        "ORDER BY id DESC LIMIT ?", (session, limit))))
 
+    def msg_recent(self, limit=5):
+        """最近的使用者提問與對應回答（沒有關鍵字、或關鍵字搜不到時使用）。"""
+        return self.db.q("SELECT u.content AS q, u.ts AS ts, (SELECT content FROM messages a WHERE a.id > u.id "
+                         "AND a.role='assistant' ORDER BY a.id LIMIT 1) AS a FROM messages u "
+                         "WHERE u.role='user' ORDER BY u.ts DESC LIMIT ?", (limit,))
+
     def msg_search(self, q, limit=5):
         """只比對使用者提問，並附上緊接著的回答（避免搜到 Agent 自己的工具輸出）。"""
         return self.db.q("SELECT u.content AS q, u.ts AS ts, (SELECT content FROM messages a WHERE a.id > u.id "

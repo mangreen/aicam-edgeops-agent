@@ -101,7 +101,7 @@ async def test_llm_cloud_failure_falls_back_to_mock(d):
     from aicam.adapters.llm import AutoLLM, CloudLLM
     class Broken(CloudLLM):
         name = "broken"
-        async def _complete(self, s, u): raise ConnectionError("offline")
+        async def _complete(self, s, u, json_mode=False): raise ConnectionError("offline")
     notes = []
     d.llm = AutoLLM(Broken(), on_fallback=notes.append)
     r = await chat.handle(d, "Lane 1 過去 7 天斷線幾次？")
