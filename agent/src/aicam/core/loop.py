@@ -85,7 +85,8 @@ class Agent:
         history = []
         for _ in range(3):
             plan = await self._plan(iid, {"kind": kind, "lane": lane, "triage": tri, "suspect": suspect, "history": history,
-                                          "available_tools": d.tools.names(plannable=True)})
+                                          "available_tools": d.tools.names(plannable=True),
+                                          "tool_schemas": [t for t in d.tools.mcp_tools() if t["name"] in d.tools.names(plannable=True)]})
             if plan["tool"] == "escalate":
                 self.ev(iid, "plan", f"規劃：升級（{plan.get('rationale', '')}）")
                 break

@@ -35,7 +35,7 @@ class MockLLM:
         return (f"【事件報告 #{i['id']}】Lane {i['lane']} {KIND_ZH.get(i['kind'], i['kind'])}\n"
                 f"根因：{CAUSE.get(i['kind'], '未知')}\n處置：{steps}\n結果：{ctx['outcome']}{extra}")
 
-    async def chat_plan(self, text, history, allowed=None):
+    async def chat_plan(self, text, history, tools=None, feedback=None):
         t, calls = text.lower(), []
         m = re.search(r"lane\s*(\d)", t)
         lane = int(m.group(1)) if m else None

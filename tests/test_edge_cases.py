@@ -92,8 +92,9 @@ def test_make_llm_selection(monkeypatch):
     monkeypatch.setattr(factory, "_online", lambda host, **kw: False)
     assert factory.make_llm().info()["provider"] == "mock"             # 有 key 但離線 → Mock
     monkeypatch.setattr(factory, "_online", lambda host, **kw: True)
-    assert factory.make_llm().info() | {} == {"provider": "openrouter", "model": "anthropic/claude-3.5-haiku",
-                                             "real": True, "fallback_active": False}
+    info = factory.make_llm().info()
+    assert (info["provider"], info["model"], info["real"], info["fallback_active"]) == (
+        "openrouter", "anthropic/claude-3.5-haiku", True, False)
     monkeypatch.setenv("LLM_PROVIDER", "mock")
     assert factory.make_llm().info()["provider"] == "mock"             # 明確指定 mock
 

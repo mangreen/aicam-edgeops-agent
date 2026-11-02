@@ -36,10 +36,15 @@ def test_default_enabled_false_disables_builtin_unless_listed(d):
 
 
 async def test_invalid_args(d):
-    for args in ({}, {"lane": "1"}, {"lane": 1, "x": 1}, {"lane": True}):
+    for args in ({}, {"lane": "x"}, {"lane": 1, "x": 1}, {"lane": True}, {"lane": [1]}):
         r = await execute(d, "restart_pipeline", args)
         assert r["blocked"] == "invalid_args", args
     assert d.edge.calls == []                                                  # 沒有任何動作被執行
+
+
+async def test_lane_string_is_coerced_not_rejected(d):
+    r = await execute(d, "restart_pipeline", {"lane": "1"})                    # LLM 常把數字寫成字串
+    assert r["ok"] and d.edge.calls == [("restart", 1)]
 
 
 def test_spec_without_valid_level_cannot_register():

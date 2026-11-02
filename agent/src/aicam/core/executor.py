@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from aicam.core import policy
 from aicam.core import versions as V
+from aicam.plugins.registry import normalize_args
 
 
 @dataclass
@@ -37,6 +38,9 @@ async def execute(d, name, args=None, call: Call | None = None):
         msg = f"工具 {name} 不存在或已停用（設定檔 [tools]）"
         d.issues.event(c.issue_id, "policy", msg)
         return {"ok": False, "blocked": "disabled", "summary": msg}
+    args, notes = normalize_args(spec, args)          # LLM 常猜錯參數名稱／型別：先做安全的校正
+    if notes:
+        d.issues.event(c.issue_id, "tool", f"{name} 參數已校正：{'；'.join(notes)}")
     if (err := d.tools.validate(spec, args)):
         d.issues.event(c.issue_id, "policy", f"{name} 參數驗證失敗：{err}")
         return {"ok": False, "blocked": "invalid_args", "summary": err}

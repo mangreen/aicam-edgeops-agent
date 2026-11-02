@@ -58,4 +58,5 @@ async def test_cloud_llm_receives_composed_prompt(d):
     d.attach_llm(AutoLLM(Cloud()))
     ans = await d.llm.converse("你是誰")
     assert ans == "我是 fake-cloud" and "只允許 Operator 查詢" in seen["system"] and "aicam-edgeopt-agent" in seen["system"]
-    assert d.llm.info() == {"provider": "fake-cloud", "model": "m1", "real": True, "fallback_active": False}
+    info = d.llm.info()
+    assert (info["provider"], info["model"], info["real"], info["fallback_active"]) == ("fake-cloud", "m1", True, False)
