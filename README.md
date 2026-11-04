@@ -1,4 +1,4 @@
-# aicam-edgeopt-agent（POC）
+# aicam-edgeops-agent（POC）
 
 地端 AI Agent，自動排除 AI 攝影機系統（得來速計時等）的故障：
 **Agent 自動修復 → Operator 現場協助 → 遠端工程師（附 incident bundle）**；可查詢 logs／metrics／traces／歷史 issue／歷史對話；

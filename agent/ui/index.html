@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-Hant"><head><meta charset="utf-8"><title>aicam-edgeopt-agent</title>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>aicam-edgeops-agent</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 :root{--bg:#0f1419;--p:#1a212b;--b:#2a3441;--t:#e6edf3;--m:#8b98a8;--ok:#3fb950;--warn:#d29922;--err:#f85149;--acc:#58a6ff}
@@ -23,7 +23,7 @@ main{flex:1;display:grid;grid-template-columns:340px 1fr 380px;gap:10px;padding:
 .chat .msg{margin-bottom:6px;padding:5px 8px;border-radius:6px;white-space:pre-wrap}.chat .user{background:#1f2f45}.chat .assistant{background:#222b36}.chat small{color:var(--m);display:block}
 input{flex:1;background:var(--bg);color:var(--t);border:1px solid var(--b);border-radius:6px;padding:6px 8px}.empty{color:var(--m);font-size:13px}.chat .blocked{background:#3a1d1d;border:1px solid var(--err)}textarea,select{background:var(--bg);color:var(--t);border:1px solid var(--b);border-radius:6px;padding:6px 8px;font:inherit;width:100%}.flash{animation:fl 1.2s ease-out}@keyframes fl{0%{box-shadow:0 0 0 3px var(--acc)}100%{box-shadow:0 0 0 0 transparent}}.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--m);border-top-color:var(--acc);border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px}@keyframes sp{to{transform:rotate(360deg)}}.real{background:#13301f!important;color:var(--ok)!important}.mock{background:#352a10!important;color:var(--warn)!important}
 </style></head><body>
-<header><h1>🍓 aicam-edgeopt-agent <span class="badge">POC</span></h1>
+<header><h1>🍓 aicam-edgeops-agent <span class="badge">POC</span></h1>
 <span class="badge" id="llm">LLM: -</span><span class="badge" id="head">config v-</span>
 <span id="demo-btns"><button onclick="fault('inference_stalled')">A 推論卡死</button><button onclick="fault('camera_no_signal')">B 攝影機斷訊</button><button onclick="fault('bad_config')">E 壞設定</button>
 <button class="dng" onclick="reset()">Reset</button></span></header>

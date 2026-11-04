@@ -48,4 +48,4 @@ Host 只需 Docker Desktop 與瀏覽器。（macOS 內建的 `pip`／`python` �
 | `make test` 失敗找不到 Docker | 啟動 Docker Desktop；本專案不需要 Host Python |
 
 ## 資料與備份
-SQLite 在 volume `agent-data`（`/data/agent.db`）。備份：`docker run --rm -v aicam-edgeopt-agent_agent-data:/d -v "$PWD":/b alpine cp /d/agent.db /b/agent.db.bak`（volume 名稱以 `docker volume ls` 為準）。Demo 資料可隨時 `make reset` 重建，不需備份。
+SQLite 在 volume `agent-data`（`/data/agent.db`）。備份：`docker run --rm -v aicam-edgeops-agent_agent-data:/d -v "$PWD":/b alpine cp /d/agent.db /b/agent.db.bak`（volume 名稱以 `docker volume ls` 為準）。Demo 資料可隨時 `make reset` 重建，不需備份。
