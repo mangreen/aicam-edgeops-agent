@@ -43,7 +43,7 @@ def create_app(rt=None, agent=None, background: bool = True) -> FastAPI:
         for t in tasks:
             t.cancel()
 
-    app = FastAPI(title="aicam-edgeopt-agent", lifespan=lifespan)
+    app = FastAPI(title="aicam-edgeops-agent", lifespan=lifespan)
     app.state.rt, app.state.agent, app.state.ui_dir = rt, agent, UI_DIR
     app.include_router(router)
     return app

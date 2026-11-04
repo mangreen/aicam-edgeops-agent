@@ -5,7 +5,7 @@ from aicam.plugins.skills import load_skills
 
 def test_compose_layers_skills_and_fixed_footer(d):
     t = d.prompts.compose("chat")
-    assert "aicam-edgeopt-agent" in t and "先給結論" in t                 # system(all) + chat-style(chat)
+    assert "aicam-edgeops-agent" in t and "先給結論" in t                 # system(all) + chat-style(chat)
     assert "[Skills]" in t and "camera-troubleshoot" in t               # 啟用的 skill
     assert "<untrusted>" in t and d.prompts.canary in t                  # 固定安全規則
     assert "先給結論" not in d.prompts.compose("agent")                  # scope 隔離
@@ -21,9 +21,9 @@ def test_ui_layer_added_live_and_disabled(d):
 
 def test_ui_layer_overrides_file_layer_and_delete_restores(d):
     d.prompts.upsert("system", "OVERRIDDEN", scope="all", priority=0)
-    assert "OVERRIDDEN" in d.prompts.compose("agent") and "你是 aicam-edgeopt-agent" not in d.prompts.compose("agent")
+    assert "OVERRIDDEN" in d.prompts.compose("agent") and "你是 aicam-edgeops-agent" not in d.prompts.compose("agent")
     d.prompts.delete("system")
-    assert "你是 aicam-edgeopt-agent" in d.prompts.compose("agent")
+    assert "你是 aicam-edgeops-agent" in d.prompts.compose("agent")
 
 
 def test_history_and_revert(d):
@@ -57,7 +57,7 @@ async def test_cloud_llm_receives_composed_prompt(d):
     d.prompts.upsert("operator-scope", "只允許 Operator 查詢。", scope="chat")
     d.attach_llm(AutoLLM(Cloud()))
     ans = await d.llm.converse("你是誰")
-    assert ans == "我是 fake-cloud" and "只允許 Operator 查詢" in seen["system"] and "aicam-edgeopt-agent" in seen["system"]
+    assert ans == "我是 fake-cloud" and "只允許 Operator 查詢" in seen["system"] and "aicam-edgeops-agent" in seen["system"]
     info = d.llm.info()
     assert (info["provider"], info["model"], info["real"], info["fallback_active"]) == ("fake-cloud", "m1", True, False)
 

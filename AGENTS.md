@@ -1,4 +1,4 @@
-# AGENTS.md — aicam-edgeopt-agent
+# AGENTS.md — aicam-edgeops-agent
 
 AI Agent／開發者進入專案的穩定規則與入口。通用規範：AI Development Guidelines v4.2。
 
