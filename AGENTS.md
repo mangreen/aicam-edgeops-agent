@@ -15,7 +15,7 @@ POC：地端 Agent 自動排除 AI 攝影機系統故障（Agent → Operator �
 ## 規則
 1. 依賴方向：`api → core → ports ← adapters`；`core` 不得 import `adapters`。新外部依賴先定義 Port。
 2. 所有工具呼叫只能走 `core/executor.execute`；新工具必須在 manifest 宣告風險等級（沒宣告即拒絕）。風險決策只在 `core/policy.py`（程式碼），不交給 LLM。
-3. 外部內容（log 等）進 LLM 前須經 content guard 並包 `<untrusted>`。
+3. 外部內容（log 等）進 LLM 前須經 content guard 並包 `<untrusted>`。需要「證據」才能放行的動作（如 rollback），證據必須由程式碼計算（`Call.evidence`），不可接受 LLM 自填的參數。
 4. 機密只放環境變數／`.env`（已 gitignore）；不得寫進 TOML、log、測試資料、回覆。
 5. 標示「POC 專用」的元件（`sim/`、`poc/`、`adapters/llm/mock.py`）不得混入正式路徑。
 6. 超出 Operator 權限的功能一律用 `[features]` 開關；不要新增未受控的管理端點。

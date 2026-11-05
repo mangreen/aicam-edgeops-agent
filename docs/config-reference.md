@@ -21,7 +21,10 @@
 `auto`：有金鑰且該服務可連線才使用雲端，否則 Mock；執行中雲端失敗會退回 Mock，30 秒內不再重試。
 
 ## `[runtime]`
-`verify_wait`（動作後等待秒數）、`operator_timeout`（Operator 逾時，demo 為 30 秒）、`detect_samples`（連續幾筆異常才建 issue）、`lanes`。
+`tool_timeout`（單一工具執行上限秒數，預設 30，逾時視為失敗）、`verify_wait`（動作後等待秒數）、`operator_timeout`（Operator 逾時，demo 為 30 秒）、`detect_samples`（連續幾筆異常才建 issue）、`lanes`。
+
+## `[ingest]`
+`max_future_sec`（預設 300）、`max_past_sec`（預設 30 天）：`POST /ingest` 的 `ts` 必須落在接收時間前後這個範圍內，否則整批回 422。另外 `NaN`／`inf` 與負的 `dur_ms` 一律拒絕。
 
 ## `[detector]`
 `window_sec`（只看最近 N 秒樣本）、`min_detections`（低於視為驟降／Verify 需高於）、`suspect_window_sec`（變更與異常的關聯視窗）、`drop_ratio`（變更後平均 < 變更前 × ratio 才視為相關）、`healthy_min_samples`。

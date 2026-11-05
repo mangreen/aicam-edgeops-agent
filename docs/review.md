@@ -72,3 +72,19 @@
 |---|---|---|
 | 問「我們之前聊果什麼？」出現「回應格式不符（invalid json）」並退回 Mock | ① 擷取 JSON 用「第一個括號到最後一個括號」，模型只要在後面多寫 `[1]`／`[搜尋歷史]` 就整段失敗；② 模型常直接用散文回答，沒有給 JSON；③ 沒有任何重試；④ 退回 Mock 後，含錯字的句子被導到錯誤的工具 | 逐位置 raw_decode；JSON mode + temperature 0（不支援時自動降級）；few-shot 與「不需要工具回空陣列」；失敗時附原因自動重問一次；Mock 意圖規則容錯；`search_history` 無關鍵字／搜不到時列最近對話；事件訊息附原始回覆片段 |
 | `make test` 出現 StarletteDeprecationWarning | Starlette 的 TestClient 優先使用 `httpx2`，僅有 `httpx` 時發出棄用警告 | 開發依賴加入 `httpx2==2.16.0`（只影響測試；執行期的 LLM 呼叫仍用 `httpx`） |
+
+## v0.2.4 外部審查（針對 v0.2.3）的查核與處置
+審查報告的主張已逐項以程式碼重現。**7 項核心問題全部屬實**，次要項大多屬實，僅「respond 不是原子操作」不成立（同時 5 次請求只有 1 次成功、4 次 409，讀狀態與更新之間沒有 `await`）。POC 階段**只修 bug**，其餘延後（見 `todo.md`）。
+
+| 問題 | 重現結果 | 處置 |
+|---|---|---|
+| 重啟後殘留 open issue 讓該車道永遠不再偵測 | `tick()` 回傳 0 個 task；handler 內二次例外會讓 issue 卡住 | **已修**：啟動 `recover()`（等待中的升級單重新接上，處理到一半的 issue 標記「重啟中斷」並結案讓偵測器重新偵測；升級也失敗則結案為 failed）；完成的 task 自動移除 |
+| rollback「相關性證據」由 LLM 自填，Policy 只檢查非空 | `evidence="x"` 即自動 rollback 他人的變更 | **已修**：證據由 loop 的 `find_suspect` 以程式碼計算並放進 `Call.evidence`，executor 驗證其對應目前 head 與目標版本；`evidence` 不再是工具參數 |
+| `execute()` 不檢查 `plannable`／`chat` | agent 來源可執行 `propose_rollback`、chat 來源可執行 `restart_pipeline` | **已修**：依呼叫來源檢查旗標；loop 自己的 triage 用 `system` 來源；`Call.origin` 預設改為 `system` |
+| `_commit_push` 忽略 edge 回應 | 推送失敗仍回 `ok=True` | **已修**：回報失敗（版本保留，標記未同步）並於背景重試；rollback 推送失敗會升級而非宣稱成功 |
+| ingest：NaN／極端 ts／交易卡死 | NaN 存成 NULL 使偵測迴圈每 2 秒拋 `TypeError`；ts +30 年回 200；一筆壞批次後所有寫入都失敗 | **已修**：拒絕 NaN／inf 與範圍外 ts（`[ingest]`）、忽略 NULL 樣本、三張表同一交易並在錯誤時 ROLLBACK；422 回應不再回顯原始輸入（否則 NaN 會讓錯誤回應本身 500）；`/api/events` limit 上限 500 |
+| 工具無 timeout | 掛住的工具會卡住 loop | **已修**：`[runtime] tool_timeout`（預設 30 秒） |
+| `normalize_args` 從文字抽數字並用於 L1 | `restart_pipeline(lane="Lane 1 and 2")` 對 Lane 1 執行 | **已修**：L1 以上只接受純數字字串，唯讀工具維持寬鬆 |
+| 限頻訊息寫死「10 分鐘」 | 窗口改設定後訊息錯誤 | **已修** |
+| `_post_verify` 的 task 沒保留參考 | event loop 只持弱參考 | **已修** |
+| 認證、預設設定、Mock 耦合、可替換性、原生 tool calling、logging、時鐘偏移 | 事實屬實 | **延後**（見 `todo.md`；POC 維持 demo 設定與「自動退回 Mock」） |

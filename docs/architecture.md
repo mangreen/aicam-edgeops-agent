@@ -78,6 +78,7 @@ flowchart TD
 
 issue 狀態：`detected → triaging → acting → verifying → resolved`；失敗路徑 `waiting_operator → escalated_engineer → resolved`。
 每條車道同時最多一個 open issue；結案後只看結案之後的新樣本，避免舊資料再次觸發。
+**重啟 recover**：handler 是記憶體中的 task，重啟後會消失，所以啟動時 `Agent.recover()` 會把仍在等待 Operator／工程師的 issue 重新接上它的待處理升級單，其他處理到一半的 issue 標記「重啟中斷」並結案（讓偵測器重新偵測）。
 
 偵測規則（`core/loop.py: classify`，優先序由上而下）：`stream_connected` 全為 0 → `camera_no_signal`；`fps` 全為 0 → `inference_stalled`；`detections_per_min` 全低於門檻 → `detection_drop`。
 
@@ -93,9 +94,9 @@ issue 狀態：`detected → triaging → acting → verifying → resolved`；�
 | L3 不可逆／未知 | 只產 incident bundle，呼叫遠端工程師 |
 
 動態規則：
-- `rollback_version`：回復 Agent 本次事件自己的變更 → L1；他人變更且附相關性證據、且目標為上一版 → L1；使用者／UI 要求、或更早版本 → 需 Operator 確認。Rollback 後 Verify 失敗不重複 rollback。
+- `rollback_version`：回復 Agent 本次事件自己的變更 → L1；他人變更、且**程式碼算出的**相關性證據（loop 的 `find_suspect` → `Call.evidence`，由 executor 驗證對應目前 head 與目標版本，LLM 無法自填）成立、且目標為上一版 → L1；使用者／UI 要求、或更早版本 → 需 Operator 確認。Rollback 後 Verify 失敗不重複 rollback。
 - `apply_config`：Operator／工程師的變更只記錄來源；Agent 只能改白名單路徑（`policy.agent_writable`），其他需 Operator 確認。
-- 所有工具呼叫唯一入口是 `core/executor.execute`：registry（啟用?）→ 參數驗證（inputSchema）→ Policy → 執行 → 紀錄。
+- 所有工具呼叫唯一入口是 `core/executor.execute`：registry（啟用?）→ 來源旗標（LLM 規劃的動作須 `plannable`，對話須 `chat`；程式自身的 triage 用 `system` 來源）→ 參數驗證（inputSchema）→ Policy → 執行（有 timeout）→ 紀錄。
 
 ## 6. 版本快照
 
@@ -139,6 +140,7 @@ issue 狀態：`detected → triaging → acting → verifying → resolved`；�
 
 ## 10. 已知限制
 
+- Detect／Verify 以 Agent 主機時間比對 edge 傳來的 `ts`（POC 同機；真實部署需以接收時間為準）。
 - 同步 SQLite 在 async handler 內執行（毫秒級小查詢，POC 接受）。
 - 無身分驗證：任何能連到 8000 埠的人都等同 Operator；正式版需 SSO／JWT 與 RBAC。
 - Guard 為規則式，可被刻意繞過；不是完整防護。正式版加 LLM 判官與 DLP。
