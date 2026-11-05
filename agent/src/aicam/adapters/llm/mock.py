@@ -23,7 +23,7 @@ class MockLLM:
             return act("reconnect_stream", {"lane": lane}, "串流中斷，依 runbook 先嘗試重連")
         if k == "detection_drop" and ctx.get("suspect") and not h:
             s = ctx["suspect"]
-            return act("rollback_version", {"to_seq": s["parent_seq"], "evidence": s["evidence"]},
+            return act("rollback_version", {"to_seq": s["parent_seq"]},
                        f"v{s['seq']}（{s['actor']}）變更後偵測數驟降，建議回到 v{s['parent_seq']}")
         return {"tool": "escalate", "args": {}, "rationale": "自動修復已無可行或安全的動作，升級處理"}
 

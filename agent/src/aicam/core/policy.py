@@ -64,6 +64,6 @@ def _rollback(args, ctx):
         return Decision("L2", "needs_operator", "回到比上一版更早的版本，需 Operator 確認")
     if head.get("actor") == "agent" and head.get("issue_id") == ctx.get("issue_id"):
         return Decision("L1", "allow", "回復 Agent 本次事件自己做的變更")
-    if args.get("evidence"):
+    if ctx.get("evidence_verified"):
         return Decision("L1", "allow", "近期他人變更與指標惡化相關（附證據），回到上一版")
     return Decision("L2", "needs_operator", "缺少相關性證據，需 Operator 確認")

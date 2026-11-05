@@ -29,7 +29,7 @@ async def test_rollback_appends_version(d):
 
 async def test_rollback_blocked_without_approval(d):
     n = d.versions.head()["seq"]
-    r = await execute(d, "rollback_version", {"to_seq": n - 1}, Call(origin="chat", actor="operator"))
+    r = await execute(d, "rollback_version", {"to_seq": n - 1}, Call(origin="ui", actor="operator"))
     assert r["blocked"] == "needs_operator" and d.versions.head()["seq"] == n
 
 

@@ -18,6 +18,7 @@ class Agent:
     L1 動作失敗 2 次、被 Policy 擋下、或 rollback Verify 失敗，一律升級而不是重試。"""
     def __init__(self, d):
         self.d, self.tasks, self.last_close = d, {}, {}
+        self._tasks_done = 0
 
     def ev(self, iid, type_, text):
         self.d.issues.event(iid, type_, text)
@@ -42,35 +43,97 @@ class Agent:
             if kind:
                 iid = self.d.issues.create(lane, kind)
                 self.ev(iid, "detect", f"偵測到 Lane {lane}「{KIND_ZH[kind]}」（規則：連續 {self.d.s.detect_samples} 筆樣本異常）")
-                self.tasks[iid] = t = asyncio.create_task(self.handle(iid))
-                new.append(t)
+                new.append(self._spawn(iid, self.handle(iid)))
         return new
+
+    def _spawn(self, iid, coro):
+        """建立 handler task 並登記；完成後自動移除（避免 tasks 無限增長，也保留參考避免被 GC）。"""
+        t = asyncio.create_task(coro)
+        self.tasks[iid] = t
+
+        def done(task, i=iid):
+            if self.tasks.get(i) is task:
+                self.tasks.pop(i, None)
+            if not task.cancelled():
+                task.exception()               # 取走例外，避免 "exception was never retrieved"
+        t.add_done_callback(done)
+        return t
+
+    def recover(self) -> list:
+        """啟動時 reconcile：重啟前的 handler task 已消失，不處理的話該車道會因 open issue 永遠不再被偵測。
+
+        - 仍有待處理升級單（等 Operator／工程師）的 issue：重新接上等待。
+        - 其他處理到一半的 issue：標記「重啟中斷」並結案，若問題仍在，偵測器會重新建立 issue。
+        """
+        d, out = self.d, []
+        pending = {}
+        for e in d.issues.esc_pending():
+            pending.setdefault(e["issue_id"], []).append(e)
+        for i in d.issues.list(1000, open_only=True):
+            iid, esc = i["id"], pending.get(i["id"], [])
+            stage = {"waiting_operator": "operator", "escalated_engineer": "engineer"}.get(i["status"])
+            mine = next((e for e in esc if e["to_who"] == stage), None) if stage else None
+            if mine:
+                self.ev(iid, "escalate", f"重啟後恢復等待 {'Operator' if stage == 'operator' else '遠端工程師'} 回覆（#{mine['id']}）")
+                out.append(self._spawn(iid, self.handle(iid, resume=(stage, mine["id"]))))
+                continue
+            for e in esc:
+                d.issues.esc_respond(e["id"], "expired", "expired")
+            d.issues.update(iid, status="interrupted", closed=time.time(), resolved_by="restart",
+                            summary="重啟時處理中斷；若問題仍在，將由偵測器重新建立 issue")
+            self.ev(iid, "error", "Agent 重啟，處理中的 issue 已中斷並結案；若問題仍在會重新偵測")
+        return out
 
     async def run_forever(self):
         while True:
             try:
+                await self.sync_config()
                 await self.tick()
             except Exception as e:
                 print("detector error:", e)
             await asyncio.sleep(2)
+
+    async def sync_config(self):
+        """config 推送失敗時（版本已建立但邊緣端沒收到），在背景重試直到同步。"""
+        d = self.d
+        if d.config_synced:
+            return
+        if (await d.edge.push_config(d.versions.head()["content"])).get("ok"):
+            d.config_synced = True
+            self.ev(None, "version", "邊緣端設定已同步到目前版本")
 
     def cancel_all(self):
         for t in self.tasks.values(): t.cancel()
         self.tasks.clear(); self.last_close.clear()
 
     # ---------- 主流程 ----------
-    async def handle(self, iid):
+    async def handle(self, iid, resume=None):
         try:
-            await self._handle(iid)
+            if resume and resume[0] == "operator":
+                await self._operator(iid, eid=resume[1])
+            elif resume:
+                await self._engineer(iid, eid=resume[1])
+            else:
+                await self._handle(iid)
         except asyncio.CancelledError:
             raise
         except Exception as e:
             self.ev(iid, "error", f"Agent 內部錯誤：{type(e).__name__}: {e}，升級遠端工程師")
-            await self._engineer(iid)
+            try:
+                await self._engineer(iid)
+            except asyncio.CancelledError:
+                raise
+            except Exception as e2:                      # 連升級都失敗：結案為 failed，避免 issue 永久卡住該車道
+                lane = self.d.issues.get(iid)["lane"]
+                self.d.issues.update(iid, status="failed", closed=time.time(), resolved_by="agent-error",
+                                     summary=f"內部錯誤且升級失敗：{type(e2).__name__}")
+                self.last_close[lane] = time.time()
+                self.ev(iid, "error", f"升級也失敗（{type(e2).__name__}: {e2}），issue 已結案為 failed")
 
     async def _handle(self, iid):
         d, issue = self.d, self.d.issues.get(iid)
-        lane, kind, call = issue["lane"], issue["kind"], Call(issue_id=iid)
+        lane, kind = issue["lane"], issue["kind"]
+        call = Call(issue_id=iid, origin="system")          # triage 由程式自己呼叫唯讀工具，不受 LLM 的 plannable 限制
         d.issues.update(iid, status="triaging")
         self.ev(iid, "triage", "Triage：查 logs / metrics / traces、相似 issue 與 runbook")
         tri_raw = [(await execute(d, "query_logs", {"lane": lane, "since_hours": 0.1, "limit": 5}, call))["summary"],
@@ -93,7 +156,11 @@ class Agent:
             self.ev(iid, "plan", f"規劃[{d.llm.name}]：{plan['tool']} {json.dumps(plan['args'], ensure_ascii=False)} — {plan.get('rationale', '')}")
             since = time.time()
             d.issues.update(iid, status="acting")
-            res = await execute(d, plan["tool"], plan["args"], call)
+            args, pcall = plan["args"], Call(issue_id=iid, origin="agent")
+            if plan["tool"] == "rollback_version":
+                # 證據由程式碼計算（find_suspect），不接受 LLM 自填；LLM 只能指定要回到哪一版
+                args, pcall = {"to_seq": plan["args"].get("to_seq")}, Call(issue_id=iid, origin="agent", evidence=suspect)
+            res = await execute(d, plan["tool"], args, pcall)
             if res.get("blocked"):
                 break
             if res.get("ok"):
@@ -178,14 +245,17 @@ class Agent:
                 return "timeout"
             await asyncio.sleep(0.4)
 
-    async def _operator(self, iid):
+    async def _operator(self, iid, eid=None):
         d, issue = self.d, self.d.issues.get(iid)
         lane, kind, to = issue["lane"], issue["kind"], d.s.operator_timeout
-        text = f"Lane {lane}「{KIND_ZH[kind]}」自動修復未成功。{HINT[kind]}。"
-        eid = d.issues.esc_create(iid, "operator", "assist", text, {"lane": lane}, timeout=to)
-        d.issues.update(iid, status="waiting_operator")
-        d.notifier.notify("operator", {"issue": iid, "text": text})
-        self.ev(iid, "escalate", f"升級給 Operator（#{eid}）：{text}（{to:g} 秒內未回應將呼叫遠端工程師）")
+        if eid is None:
+            text = f"Lane {lane}「{KIND_ZH[kind]}」自動修復未成功。{HINT[kind]}。"
+            eid = d.issues.esc_create(iid, "operator", "assist", text, {"lane": lane}, timeout=to)
+            d.issues.update(iid, status="waiting_operator")
+            d.notifier.notify("operator", {"issue": iid, "text": text})
+            self.ev(iid, "escalate", f"升級給 Operator（#{eid}）：{text}（{to:g} 秒內未回應將呼叫遠端工程師）")
+        else:                                              # 重啟後恢復：只等剩餘時間
+            to = max(0.0, (d.issues.esc_get(eid)["deadline"] or time.time()) - time.time())
         resp = await self._wait(eid, to)
         if resp == "fixed":
             since = time.time()
@@ -198,8 +268,21 @@ class Agent:
             self.ev(iid, "operator", "Operator 回報「無法處理」" if resp == "cannot" else "Operator 逾時未回應")
         await self._engineer(iid)
 
-    async def _engineer(self, iid):
+    async def _engineer(self, iid, eid=None):
         d, issue = self.d, self.d.issues.get(iid)
+        lane = issue["lane"]
+        if eid is None:
+            eid = await self._send_bundle(iid, issue)
+        if await self._wait(eid, None) == "fixed":
+            since = time.time()
+            await d.edge.physical_fix(lane)
+            self.ev(iid, "engineer", "遠端工程師回報「已修復」（POC：模擬）")
+            ok = await self.verify(iid, [lane], since)
+            await self.resolve(iid, "engineer", "遠端工程師處理後恢復" if ok else "遠端工程師已處理，仍需觀察")
+
+    async def _send_bundle(self, iid, issue):
+        """產生 incident bundle、建立升級單並通知遠端工程師；回傳升級單 id。"""
+        d = self.d
         lane, kind = issue["lane"], issue["kind"]
         ctx = {"issue": issue, "actions": d.issues.actions(iid), "outcome": "未能自動修復，已升級遠端工程師", "suspect": None}
         try:
@@ -216,9 +299,4 @@ class Agent:
         d.issues.update(iid, status="escalated_engineer")
         d.notifier.notify("engineer", {"issue": iid, "bundle_escalation": eid})
         self.ev(iid, "escalate", f"已呼叫遠端工程師（#{eid}）：incident bundle 已送出（摘要、時間軸、已嘗試動作、logs、建議下一步）")
-        if await self._wait(eid, None) == "fixed":
-            since = time.time()
-            await d.edge.physical_fix(lane)
-            self.ev(iid, "engineer", "遠端工程師回報「已修復」（POC：模擬）")
-            ok = await self.verify(iid, [lane], since)
-            await self.resolve(iid, "engineer", "遠端工程師處理後恢復" if ok else "遠端工程師已處理，仍需觀察")
+        return eid

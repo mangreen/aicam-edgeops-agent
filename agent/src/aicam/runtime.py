@@ -26,6 +26,7 @@ class Runtime:
     tools: object = None  # ToolRegistry
     skills: list = field(default_factory=list)
     overrides: dict = field(default_factory=dict)   # 執行期工具開關（重載設定檔時清除）
+    config_synced: bool = True   # 目前版本是否已成功推送到邊緣端；False 時由 Agent 背景重試
     guards: object = None   # GuardPipeline
     prompts: object = None  # PromptStore
 

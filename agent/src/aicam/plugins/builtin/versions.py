@@ -50,8 +50,14 @@ async def _commit_push(d, c, content, reason):
     except ValueError as e:
         return {"ok": False, "summary": str(e)}
     if changed:
-        await d.edge.push_config(v["content"])
         d.issues.event(c.issue_id, "version", f"新增 v{v['seq']}（{c.actor}）：{reason}")
+        r = await d.edge.push_config(v["content"])
+        if not r.get("ok"):
+            # 版本已建立（append-only，不刪）但邊緣端沒有收到：如實回報失敗，並由 Agent 背景重試同步
+            d.config_synced = False
+            d.issues.event(c.issue_id, "error", f"v{v['seq']} 推送到邊緣端失敗（{r.get('msg', '')}），將於背景重試")
+            return {"ok": False, "changed": True, "seq": v["seq"],
+                    "summary": f"v{v['seq']} 已建立，但推送到邊緣端失敗（{r.get('msg', '')}），尚未生效"}
     return {"ok": True, "changed": changed, "seq": v["seq"],
             "summary": f"v{v['seq']} {'已建立' if changed else '內容相同，未新增版本'}"}
 
@@ -61,8 +67,8 @@ async def apply_config(d, c, patch, reason):
     return await _commit_push(d, c, V.merge(d.versions.head()["content"], patch), reason)
 
 
-@box.tool("rollback_version", "rollback 到指定版本（新增一版，內容等於目標版）", {"to_seq": _int("目標版本"), "evidence": _str("相關性證據")}, ("to_seq",), level="L1", plannable=True)
-async def rollback_version(d, c, to_seq, evidence=None):
+@box.tool("rollback_version", "rollback 到指定版本（新增一版，內容等於目標版）", {"to_seq": _int("目標版本")}, ("to_seq",), level="L1", plannable=True)
+async def rollback_version(d, c, to_seq):   # 相關性證據不是參數：由 loop 以程式碼計算並放在 Call.evidence
     t = d.versions.get(to_seq)
     if not t:
         return {"ok": False, "summary": f"無 v{to_seq}"}

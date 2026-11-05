@@ -47,12 +47,13 @@ def test_rollback_own_change_is_l1():
 
 def test_rollback_others_change_needs_evidence():
     assert ev("rollback_version", {"to_seq": 6}) == "needs_operator"
-    assert ev("rollback_version", {"to_seq": 6, "evidence": "偵測數 14→0"}) == "allow"
+    assert ev("rollback_version", {"to_seq": 6}, evidence_verified=True) == "allow"       # 證據由程式碼驗證，不看 LLM 參數
+    assert ev("rollback_version", {"to_seq": 6, "evidence": "偵測數 14→0"}) == "needs_operator"   # LLM 自填的字串無效
 
 
 def test_rollback_older_or_user_request_needs_operator():
-    assert ev("rollback_version", {"to_seq": 4, "evidence": "x"}) == "needs_operator"
-    assert ev("rollback_version", {"to_seq": 6, "evidence": "x"}, origin="chat") == "needs_operator"
+    assert ev("rollback_version", {"to_seq": 4}, evidence_verified=True) == "needs_operator"
+    assert ev("rollback_version", {"to_seq": 6}, evidence_verified=True, origin="chat") == "needs_operator"
     assert ev("rollback_version", {"to_seq": 4}, origin="chat", approved=True) == "allow"
 
 

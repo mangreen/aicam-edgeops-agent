@@ -35,6 +35,8 @@ def create_app(rt=None, agent=None, background: bool = True) -> FastAPI:
             app.state.rt.attach_llm(make_llm(lambda m: app.state.rt.issues.event(None, "llm", m)))
             seed.run(app.state.rt)
             app.state.agent = Agent(app.state.rt)
+        if app.state.agent is not None and background:
+            app.state.agent.recover()           # 重啟後接回／結案處理到一半的 issue
         tasks = []
         if background:
             tasks = [asyncio.create_task(app.state.agent.run_forever()),
