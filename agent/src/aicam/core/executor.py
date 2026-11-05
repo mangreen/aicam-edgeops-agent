@@ -1,4 +1,5 @@
 """工具執行入口：所有 tool 呼叫都必須經過這裡（registry → 參數驗證 → Policy gate → 執行 → 紀錄）。"""
+import asyncio
 import json
 import time
 import uuid
@@ -71,7 +72,9 @@ async def execute(d, name, args=None, call: Call | None = None):
         aid = uuid.uuid4().hex[:10]
         d.issues.action_start(aid, c.issue_id, name, args, dec.level, c.actor)
     try:
-        res = await spec.fn(d, c, **args)
+        res = await asyncio.wait_for(spec.fn(d, c, **args), d.s.tool_timeout)
+    except TimeoutError:
+        res = {"ok": False, "summary": f"工具 {name} 執行逾時（超過 {d.s.tool_timeout:g} 秒）"}
     except Exception as e:                                   # 工具錯誤不可中斷 loop
         res = {"ok": False, "summary": f"{type(e).__name__}: {e}"}
     res.setdefault("ok", True)

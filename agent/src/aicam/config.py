@@ -48,6 +48,7 @@ class Settings:
     verify_wait: float = 7.0
     operator_timeout: float = 30.0
     detect_samples: int = 3
+    tool_timeout: float = 30.0        # 單一工具執行的上限秒數；逾時視為失敗，避免卡住整個 loop
     lanes: tuple = (1, 2)
     detector: DetectorCfg = field(default_factory=DetectorCfg)
     policy: PolicyCfg = field(default_factory=PolicyCfg)
@@ -81,6 +82,7 @@ def load_settings(path: str | None = None, env=None) -> Settings:
         verify_wait=float(env.get("VERIFY_WAIT", rt.get("verify_wait", 7))),
         operator_timeout=float(env.get("OPERATOR_TIMEOUT", rt.get("operator_timeout", 30))),
         detect_samples=int(rt.get("detect_samples", 3)),
+        tool_timeout=float(rt.get("tool_timeout", 30)),
         lanes=tuple(rt.get("lanes", (1, 2))),
         detector=DetectorCfg(**raw.get("detector", {})),
         ingest=IngestCfg(**raw.get("ingest", {})),

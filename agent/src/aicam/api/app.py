@@ -49,6 +49,7 @@ def create_app(rt=None, agent=None, background: bool = True) -> FastAPI:
 
     app = FastAPI(title="aicam-edgeops-agent", lifespan=lifespan)
     app.state.rt, app.state.agent, app.state.ui_dir = rt, agent, UI_DIR
+    app.state.bg = set()          # 背景 task 的強參考
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(_req: Request, exc: RequestValidationError):

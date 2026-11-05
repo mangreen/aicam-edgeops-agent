@@ -36,7 +36,8 @@ def evaluate(tool: str, args: dict, ctx: dict) -> Decision:
             if a["tool"] == tool and a.get("lane") == lane and ctx["now"] - a["ts"] < ctx.get("rate_window", RATE_WINDOW))
     mx = ctx.get("l1_max", 2)
     if n >= mx:
-        return Decision("L1", "deny", f"超過 L1 頻率限制（{mx} 次/10 分鐘），防止重啟風暴")
+        window = ctx.get("rate_window", RATE_WINDOW)
+        return Decision("L1", "deny", f"超過 L1 頻率限制（{mx} 次/{window / 60:g} 分鐘），防止重啟風暴")
     return Decision("L1", "allow", f"可逆低風險（本窗口已 {n}/{mx} 次）")
 
 

@@ -129,7 +129,9 @@ async def respond(eid: int, body: RespondBody, request: Request):
     to = json.loads(e["payload"])["to_seq"]
     d.issues.event(e["issue_id"], "operator", f"Operator 確認 rollback 到 v{to}（#{eid}）")
     r = await execute(d, "rollback_version", {"to_seq": to}, Call(origin="ui", actor="operator", approved=True))
-    asyncio.create_task(_post_verify(request))
+    t = asyncio.create_task(_post_verify(request))
+    request.app.state.bg.add(t)                      # 保留參考：event loop 只持有 task 的弱參考，可能被 GC 回收
+    t.add_done_callback(request.app.state.bg.discard)
     return r
 
 

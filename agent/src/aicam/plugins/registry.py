@@ -117,14 +117,21 @@ def parse_hours(v) -> float | None:
     return float(m.group(1)) * _UNIT_H[unit] if unit in _UNIT_H else None
 
 
-def _coerce(key: str, typ: str, v):
-    """依 schema 型別轉換字串值；轉不了就原樣回傳，交給後續驗證拒絕。"""
+def _coerce(key: str, typ: str, v, strict: bool = False):
+    """依 schema 型別轉換字串值；轉不了就原樣回傳，交給後續驗證拒絕。
+
+    strict=True（會改變系統狀態的工具）只接受「純數字字串」，不從文字中抽數字：
+    否則 "Lane 1 and 2" 會被靜默轉成 1 並真的對 Lane 1 執行動作。
+    """
     if typ == "integer" and isinstance(v, (str, float)) and not isinstance(v, bool):
-        m = re.search(r"-?\d+", str(v)) if isinstance(v, str) else None
         if isinstance(v, float) and v.is_integer():
             return int(v)
-        if m and (key in ("lane", "seq", "to_seq", "a", "b", "limit") or str(v).strip().lstrip("-").isdigit()):
-            return int(m.group(0))
+        if isinstance(v, str):
+            if re.fullmatch(r"\s*-?\d+\s*", v):
+                return int(v)
+            m = None if strict else re.search(r"-?\d+", v)
+            if m and key in ("lane", "seq", "to_seq", "a", "b", "limit"):
+                return int(m.group(0))
     if typ == "number" and not isinstance(v, bool):
         if key == "since_hours":
             h = parse_hours(v)
@@ -157,7 +164,7 @@ def normalize_args(spec: ToolSpec, args: dict) -> tuple[dict, list[str]]:
         out[k] = v
     for k in list(out):
         if k in spec.props:
-            nv = _coerce(k, spec.props[k].get("type", ""), out[k])
+            nv = _coerce(k, spec.props[k].get("type", ""), out[k], strict=spec.level != "L0")
             if nv != out[k]:
                 notes.append(f"{k}: {out[k]!r}→{nv!r}")
             out[k] = nv
