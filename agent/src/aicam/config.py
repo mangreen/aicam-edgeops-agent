@@ -34,6 +34,13 @@ class PolicyCfg:
 
 
 @dataclass(frozen=True)
+class IngestCfg:
+    """/ingest 允許的時間戳範圍（相對於接收時間）：擋掉明顯錯誤或惡意的 ts。"""
+    max_future_sec: float = 300.0
+    max_past_sec: float = 30 * 86400.0
+
+
+@dataclass(frozen=True)
 class Settings:
     """不可變設定。TOML 區段保存在 raw，由 plugins／guards／prompts 各自解析。"""
     db_path: str = ":memory:"
@@ -44,6 +51,7 @@ class Settings:
     lanes: tuple = (1, 2)
     detector: DetectorCfg = field(default_factory=DetectorCfg)
     policy: PolicyCfg = field(default_factory=PolicyCfg)
+    ingest: IngestCfg = field(default_factory=IngestCfg)
     raw: dict = field(default_factory=dict)   # 完整 TOML，供 plugins / guards / rbac 解析
     config_path: str = ""
 
@@ -75,6 +83,7 @@ def load_settings(path: str | None = None, env=None) -> Settings:
         detect_samples=int(rt.get("detect_samples", 3)),
         lanes=tuple(rt.get("lanes", (1, 2))),
         detector=DetectorCfg(**raw.get("detector", {})),
+        ingest=IngestCfg(**raw.get("ingest", {})),
         policy=PolicyCfg(**{**raw.get("policy", {}), **({"agent_writable": tuple(raw["policy"]["agent_writable"])} if "agent_writable" in raw.get("policy", {}) else {})}),
         raw=raw, config_path=path,
     )

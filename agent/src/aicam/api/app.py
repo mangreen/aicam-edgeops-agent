@@ -3,7 +3,9 @@ import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from aicam.adapters.edge import SimClient
 from aicam.adapters.llm import make_llm
@@ -47,6 +49,12 @@ def create_app(rt=None, agent=None, background: bool = True) -> FastAPI:
 
     app = FastAPI(title="aicam-edgeops-agent", lifespan=lifespan)
     app.state.rt, app.state.agent, app.state.ui_dir = rt, agent, UI_DIR
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_error(_req: Request, exc: RequestValidationError):
+        """預設的 422 內容會附上原始輸入；輸入含 NaN／inf 時序列化會失敗而變成 500，所以只回傳位置、訊息與型別。"""
+        return JSONResponse(status_code=422, content={"detail": [
+            {"loc": [str(x) for x in e["loc"]], "msg": e["msg"], "type": e["type"]} for e in exc.errors()]})
     app.include_router(router)
     return app
 

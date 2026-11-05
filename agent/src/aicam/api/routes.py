@@ -4,7 +4,7 @@ import json
 import re
 import time
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
 
 from aicam.core import chat
@@ -40,7 +40,12 @@ def health():
 
 @router.post("/ingest")
 def ingest(body: IngestBody, request: Request):
-    rt(request).obs.ingest([x.model_dump() for x in body.logs], [x.model_dump() for x in body.metrics],
+    d = rt(request)
+    now, cfg = time.time(), d.s.ingest
+    for row in (*body.logs, *body.metrics, *body.spans):
+        if not (now - cfg.max_past_sec <= row.ts <= now + cfg.max_future_sec):
+            raise HTTPException(422, f"ts 超出允許範圍（過去 {cfg.max_past_sec:g} 秒～未來 {cfg.max_future_sec:g} 秒）")
+    d.obs.ingest([x.model_dump() for x in body.logs], [x.model_dump() for x in body.metrics],
                            [x.model_dump() for x in body.spans])
     return {"ok": True}
 
@@ -59,9 +64,9 @@ def tool_list(request: Request):
 
 
 @router.get("/api/events")
-def events(request: Request, after: int = 0, limit: int = 100):
-    rows = rt(request).issues.events(after, 100000)
-    return rows[-limit:] if not after else rows[:limit]
+def events(request: Request, after: int = 0, limit: int = Query(100, ge=1, le=500)):
+    issues = rt(request).issues
+    return issues.events(after, limit) if after else issues.events_latest(limit)
 
 
 @router.get("/api/stream")

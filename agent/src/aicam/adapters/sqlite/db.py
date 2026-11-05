@@ -44,9 +44,18 @@ class DB:
             return self.conn.execute(sql, args).lastrowid
 
     def many(self, sql, rows):
+        self.many_multi([(sql, rows)])
+
+    def many_multi(self, batches):
+        """多組 executemany 放在同一個交易；任何錯誤都 ROLLBACK 後再丟出（否則連線會卡在交易中，之後所有寫入都失敗）。"""
         with self.lock:
             self.conn.execute("BEGIN")
-            self.conn.executemany(sql, rows)
+            try:
+                for sql, rows in batches:
+                    self.conn.executemany(sql, rows)
+            except BaseException:
+                self.conn.execute("ROLLBACK")
+                raise
             self.conn.execute("COMMIT")
 
     def wipe(self):

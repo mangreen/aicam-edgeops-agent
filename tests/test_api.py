@@ -1,3 +1,4 @@
+import time
 from dataclasses import replace
 
 import pytest
@@ -8,8 +9,9 @@ def enable(d, **features):
 
 
 def test_ingest_validates_and_stores(client, d):
-    ok = {"logs": [{"ts": 1.0, "lane": 1, "level": "INFO", "msg": "hi"}],
-          "metrics": [{"ts": 1.0, "lane": 1, "name": "fps", "value": 15}], "spans": []}
+    now = time.time()
+    ok = {"logs": [{"ts": now, "lane": 1, "level": "INFO", "msg": "hi"}],
+          "metrics": [{"ts": now, "lane": 1, "name": "fps", "value": 15}], "spans": []}
     assert client.post("/ingest", json=ok).status_code == 200
     assert d.obs.count_logs(1, "hi") == 1
 

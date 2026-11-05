@@ -29,6 +29,10 @@ class SqliteIssues:
         return self.db.x("INSERT INTO events(ts,issue_id,type,text) VALUES(?,?,?,?)",
                          (time.time(), issue_id, type_, text))
 
+    def events_latest(self, limit=100):
+        """最近 N 筆事件（由舊到新）。"""
+        return self.db.q("SELECT * FROM (SELECT * FROM events ORDER BY id DESC LIMIT ?) ORDER BY id", (limit,))
+
     def events(self, after=0, limit=200, issue_id=None):
         if issue_id is not None:
             return self.db.q("SELECT * FROM events WHERE issue_id=? ORDER BY id", (issue_id,))

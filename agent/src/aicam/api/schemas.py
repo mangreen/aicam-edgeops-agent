@@ -5,17 +5,17 @@ from pydantic import BaseModel, Field
 
 
 class LogRow(BaseModel):
-    ts: float
+    ts: float = Field(allow_inf_nan=False)
     lane: int = Field(ge=0, le=64)
     level: Literal["DEBUG", "INFO", "WARN", "ERROR"]
     msg: str = Field(max_length=2000)
 
 
 class MetricRow(BaseModel):
-    ts: float
+    ts: float = Field(allow_inf_nan=False)
     lane: int = Field(ge=0, le=64)
     name: str = Field(max_length=64)
-    value: float
+    value: float = Field(allow_inf_nan=False)       # NaN／inf 會被存成 NULL 並讓偵測迴圈出錯
 
 
 class SpanRow(BaseModel):
@@ -24,8 +24,8 @@ class SpanRow(BaseModel):
     parent_id: str | None = Field(default=None, max_length=64)
     name: str = Field(max_length=64)
     lane: int = Field(ge=0, le=64)
-    ts: float
-    dur_ms: float
+    ts: float = Field(allow_inf_nan=False)
+    dur_ms: float = Field(allow_inf_nan=False, ge=0)
     status: Literal["ok", "error"]
 
 
