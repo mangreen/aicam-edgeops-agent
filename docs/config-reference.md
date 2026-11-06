@@ -10,7 +10,7 @@
 |---|---|---|
 | `AICAM_CONFIG` | 設定檔路徑 | 容器 `/app/config/agent.toml` |
 | `DB_PATH` / `SIM_URL` | SQLite 路徑／邊緣控制 API | `/data/agent.db`／`http://sim:8001` |
-| `VERIFY_WAIT` / `OPERATOR_TIMEOUT` | 覆寫 `[runtime]` 同名鍵 | 7／30 秒 |
+| `SIM_RECONNECT_RETRIES` | sim：reconnect 失敗訊息中顯示的重試次數（改後需 `make up` 重建 sim 容器） | `3` |
 | `AICAM_ENV_FILE` | Reset 時讀取的 `.env` 路徑（compose 已將 `./.env` 唯讀掛到 `/app/.env`） | `/app/.env` |
 | `LLM_PROVIDER` | `mock`｜`auto`｜`anthropic`｜`openai`｜`openrouter` | `mock`（`.env.example`） |
 | `ANTHROPIC_API_KEY` `OPENAI_API_KEY` `OPENROUTER_API_KEY` | 雲端 LLM 金鑰（只放 `.env`） | 空 |
@@ -21,7 +21,8 @@
 `auto`：有金鑰且該服務可連線才使用雲端，否則 Mock；執行中雲端失敗會退回 Mock，30 秒內不再重試。
 
 ## `[runtime]`
-`tool_timeout`（單一工具執行上限秒數，預設 30，逾時視為失敗）、`verify_wait`（動作後等待秒數）、`operator_timeout`（Operator 逾時，demo 為 30 秒）、`detect_samples`（連續幾筆異常才建 issue）、`lanes`。
+**時間與重試類的調校只由 `agent.toml` 決定，不讀環境變數**（舊 `.env` 裡殘留的 `VERIFY_WAIT`／`OPERATOR_TIMEOUT` 已不再生效）；改完按 UI「重載設定檔」立即生效。加速 demo 的建議值見 `docs/demo-script.md`。
+`max_attempts`（Agent 對同一個 issue 自動修復的最多嘗試次數，預設 2、最小 1，用完仍失敗就升級 Operator；大於 2 時須一併調高版本設定內的 `policy.l1_max_per_10min`，否則 Policy 的頻率限制會先擋下）、`tool_timeout`（單一工具執行上限秒數，預設 30，逾時視為失敗）、`verify_wait`（動作後等待秒數）、`operator_timeout`（Operator 逾時，demo 為 30 秒）、`detect_samples`（連續幾筆異常才建 issue）、`lanes`。
 
 ## `[ingest]`
 `max_future_sec`（預設 300）、`max_past_sec`（預設 30 天）：`POST /ingest` 的 `ts` 必須落在接收時間前後這個範圍內，否則整批回 422。另外 `NaN`／`inf` 與負的 `dur_ms` 一律拒絕。

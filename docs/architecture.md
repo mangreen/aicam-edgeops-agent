@@ -76,7 +76,7 @@ flowchart TD
   ENG --> R
 ```
 
-issue 狀態：`detected → triaging → acting → verifying → resolved`；失敗路徑 `waiting_operator → escalated_engineer → resolved`。
+issue 狀態：`detected → triaging → acting → verifying → resolved`（另有 `interrupted`：重啟時中斷；`failed`：內部錯誤且升級也失敗）；自動修復最多嘗試 `[runtime] max_attempts` 次（由 loop 強制，不靠 LLM 自己停）；失敗路徑 `waiting_operator → escalated_engineer → resolved`。
 每條車道同時最多一個 open issue；結案後只看結案之後的新樣本，避免舊資料再次觸發。
 **重啟 recover**：handler 是記憶體中的 task，重啟後會消失，所以啟動時 `Agent.recover()` 會把仍在等待 Operator／工程師的 issue 重新接上它的待處理升級單，其他處理到一半的 issue 標記「重啟中斷」並結案（讓偵測器重新偵測）。
 

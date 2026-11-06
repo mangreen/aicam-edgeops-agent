@@ -76,6 +76,19 @@
 
 ---
 
+## 2.6 加速 demo 的設定（`config/agent.toml` 的 `[runtime]`，改後按 ⚙能力 →「重載設定檔」立即生效）
+
+| 設定 | 預設 | 加速建議 | 效果與限制 |
+|---|---|---|---|
+| `detect_samples` | 3 | 2 | 偵測約 6 秒 → 4 秒（sim 每 2 秒一筆）；太小容易誤判 |
+| `verify_wait` | 7 | 5 | 動作後等待重查的時間；**至少要含 2 個取樣週期（≥ 5）**，太小會因樣本不足而誤判 Verify 失敗 |
+| `max_attempts` | 2 | 1 | Agent 自動重試幾次才升級 Operator；B→C 少一次重連。大於 2 須一併調高 `policy.l1_max_per_10min` |
+| `operator_timeout` | 30 | 15～30 | Operator 逾時多久自動呼叫遠端工程師（demo 通常手動按「無法處理」） |
+
+實測（真實 sim）：A 自動修復 14.0 秒 → **10.0 秒**；B→C 的 Operator 請求出現 7.0 秒 → **4.9 秒**，且只重連 1 次（時間軸會顯示「第 1/1 次嘗試」）。
+sim 的 `reconnect` 失敗訊息預設寫 `no signal after 3 retries`，可在 `.env` 設 `SIM_RECONNECT_RETRIES=1`（改後 `make up` 重建容器）；這只影響訊息文字。
+注意：先前 `.env.example` 內的 `VERIFY_WAIT`／`OPERATOR_TIMEOUT` 已不再生效，請只改 `agent.toml`。
+
 ## 3. 失敗備案
 
 | 狀況 | 處置 |
