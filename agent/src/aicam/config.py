@@ -48,6 +48,7 @@ class Settings:
     verify_wait: float = 7.0
     operator_timeout: float = 30.0
     detect_samples: int = 3
+    max_attempts: int = 2             # Agent 對同一個 issue 自動修復的最多嘗試次數；用完仍失敗就升級 Operator（調小可加快 demo）
     tool_timeout: float = 30.0        # 單一工具執行的上限秒數；逾時視為失敗，避免卡住整個 loop
     lanes: tuple = (1, 2)
     detector: DetectorCfg = field(default_factory=DetectorCfg)
@@ -79,9 +80,12 @@ def load_settings(path: str | None = None, env=None) -> Settings:
     s = Settings(
         db_path=env.get("DB_PATH", rt.get("db_path", "/data/agent.db")),
         sim_url=env.get("SIM_URL", rt.get("sim_url", "http://sim:8001")),
-        verify_wait=float(env.get("VERIFY_WAIT", rt.get("verify_wait", 7))),
-        operator_timeout=float(env.get("OPERATOR_TIMEOUT", rt.get("operator_timeout", 30))),
+        # 時間／次數類的調校只由 agent.toml 決定（不讀環境變數）：舊的 .env 若殘留 VERIFY_WAIT 之類的值，
+        # 會靜默蓋掉你在 TOML 的修改，而且容器環境變數無法熱重載。
+        verify_wait=float(rt.get("verify_wait", 7)),
+        operator_timeout=float(rt.get("operator_timeout", 30)),
         detect_samples=int(rt.get("detect_samples", 3)),
+        max_attempts=max(1, int(rt.get("max_attempts", 2))),
         tool_timeout=float(rt.get("tool_timeout", 30)),
         lanes=tuple(rt.get("lanes", (1, 2))),
         detector=DetectorCfg(**raw.get("detector", {})),

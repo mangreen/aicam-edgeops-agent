@@ -6,6 +6,7 @@ services:
     read_only: true
     environment:
       AGENT_URL: http://agent:8000
+      SIM_RECONNECT_RETRIES: ${SIM_RECONNECT_RETRIES:-3}   # reconnect 失敗訊息中的重試次數（可在 .env 調整）
     ports: ["8001:8001"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8001/health')"]

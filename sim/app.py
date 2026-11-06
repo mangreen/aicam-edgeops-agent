@@ -11,6 +11,7 @@ from fastapi import FastAPI, HTTPException
 
 AGENT_URL = os.getenv("AGENT_URL", "http://agent:8000")
 TICK = float(os.getenv("SIM_TICK", "2"))
+RECONNECT_RETRIES = int(os.getenv("SIM_RECONNECT_RETRIES", "3"))   # 模擬 reconnect 內部重試次數（只影響回報文字）
 BASE_AREA = 640 * 300
 LANES = (1, 2)
 DEFAULT_CFG = {"model": "vehicle-det-1.2.0", "policy": {"l1_max_per_10min": 2},
@@ -128,8 +129,8 @@ def restart_pipeline(lane: int):
 def reconnect_stream(lane: int):
     st = _lane(lane)
     if not st["camera"]:
-        log(lane, "WARN", "reconnect failed: no signal after 3 retries")
-        return {"ok": False, "msg": "no signal after 3 retries"}
+        log(lane, "WARN", f"reconnect failed: no signal after {RECONNECT_RETRIES} retries")
+        return {"ok": False, "msg": f"no signal after {RECONNECT_RETRIES} retries"}
     log(lane, "INFO", "stream reconnected")
     return {"ok": True, "msg": "stream reconnected"}
 

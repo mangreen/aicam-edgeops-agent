@@ -11,15 +11,16 @@ class MockLLM:
     async def plan(self, ctx):
         k, lane, h = ctx["kind"], ctx["lane"], ctx["history"]
         fails = [x for x in h if not x["ok"]]
+        cap = ctx.get("max_attempts", 2)               # 自動修復嘗試上限（[runtime] max_attempts）
         avail = ctx.get("available_tools")
 
         def act(tool, args, why):
             if avail is not None and tool not in avail:      # 設定檔已停用該工具 → 不提案，直接升級
                 return {"tool": "escalate", "args": {}, "rationale": f"工具 {tool} 已停用（設定檔），無法自動處理"}
             return {"tool": tool, "args": args, "rationale": why}
-        if k == "inference_stalled" and len(fails) < 2:
+        if k == "inference_stalled" and len(fails) < cap:
             return act("restart_pipeline", {"lane": lane}, "FPS 歸零但串流正常，依 runbook 先重啟 pipeline")
-        if k == "camera_no_signal" and len(fails) < 2:
+        if k == "camera_no_signal" and len(fails) < cap:
             return act("reconnect_stream", {"lane": lane}, "串流中斷，依 runbook 先嘗試重連")
         if k == "detection_drop" and ctx.get("suspect") and not h:
             s = ctx["suspect"]

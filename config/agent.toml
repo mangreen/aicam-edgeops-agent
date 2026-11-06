@@ -2,9 +2,10 @@
 # 機密（API key）只放環境變數 / .env，不要寫在這裡。
 
 [runtime]
-verify_wait = 7          # 動作後等待幾秒再重查指標
+verify_wait = 7          # 動作後等待幾秒再重查指標（至少要含 2 個 sim 取樣週期，sim 每 2 秒一筆，建議 ≥ 5）
 operator_timeout = 30    # demo 縮短；正式環境應為分鐘級
-detect_samples = 3       # 連續幾筆樣本異常才建立 issue
+detect_samples = 3       # 連續幾筆樣本異常才建立 issue（sim 每 2 秒一筆，3 筆約 6 秒；調成 2 約 4 秒）
+max_attempts = 2         # Agent 對同一個 issue 自動修復的最多嘗試次數；用完仍失敗就升級 Operator（調成 1 可加快 demo）
 tool_timeout = 30        # 單一工具執行上限（秒）；逾時視為失敗，不會卡住 loop
 lanes = [1, 2]
 

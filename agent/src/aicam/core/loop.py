@@ -66,6 +66,7 @@ class Agent:
         - 其他處理到一半的 issue：標記「重啟中斷」並結案，若問題仍在，偵測器會重新建立 issue。
         """
         d, out = self.d, []
+        resumed = interrupted = 0
         pending = {}
         for e in d.issues.esc_pending():
             pending.setdefault(e["issue_id"], []).append(e)
@@ -76,12 +77,17 @@ class Agent:
             if mine:
                 self.ev(iid, "escalate", f"重啟後恢復等待 {'Operator' if stage == 'operator' else '遠端工程師'} 回覆（#{mine['id']}）")
                 out.append(self._spawn(iid, self.handle(iid, resume=(stage, mine["id"]))))
+                resumed += 1
                 continue
             for e in esc:
                 d.issues.esc_respond(e["id"], "expired", "expired")
             d.issues.update(iid, status="interrupted", closed=time.time(), resolved_by="restart",
                             summary="重啟時處理中斷；若問題仍在，將由偵測器重新建立 issue")
             self.ev(iid, "error", "Agent 重啟，處理中的 issue 已中斷並結案；若問題仍在會重新偵測")
+            interrupted += 1
+        if resumed or interrupted:                      # 讓使用者在時間軸上看得到重啟後的處置（issue 仍可在歷史 issue／對話查詢）
+            self.ev(None, "system", f"Agent 啟動：恢復等待中的 issue {resumed} 個、中斷並結案處理到一半的 issue {interrupted} 個"
+                                    "（中斷的 issue 若問題仍在會重新偵測；詳見各 issue 的時間軸）")
         return out
 
     async def run_forever(self):
@@ -145,15 +151,19 @@ class Agent:
         suspect = self.find_suspect(lane, issue["created"]) if kind == "detection_drop" else None
         if suspect:
             self.ev(iid, "triage", f"關聯變更：v{suspect['seq']}（{suspect['actor']}）{suspect['diff']}；{suspect['evidence']}")
-        history = []
-        for _ in range(3):
+        history, attempts, cap = [], 0, d.s.max_attempts
+        for _ in range(cap + 2):                      # 多留一輪讓 LLM 有機會自己決定 escalate
             plan = await self._plan(iid, {"kind": kind, "lane": lane, "triage": tri, "suspect": suspect, "history": history,
+                                          "max_attempts": cap,
                                           "available_tools": d.tools.names(plannable=True),
                                           "tool_schemas": [t for t in d.tools.mcp_tools() if t["name"] in d.tools.names(plannable=True)]})
             if plan["tool"] == "escalate":
                 self.ev(iid, "plan", f"規劃：升級（{plan.get('rationale', '')}）")
                 break
-            self.ev(iid, "plan", f"規劃[{d.llm.name}]：{plan['tool']} {json.dumps(plan['args'], ensure_ascii=False)} — {plan.get('rationale', '')}")
+            if attempts >= cap:
+                self.ev(iid, "plan", f"已達自動修復嘗試上限（{cap} 次，[runtime] max_attempts），升級 Operator")
+                break
+            self.ev(iid, "plan", f"規劃[{d.llm.name}]：第 {attempts + 1}/{cap} 次嘗試 {plan['tool']} {json.dumps(plan['args'], ensure_ascii=False)} — {plan.get('rationale', '')}")
             since = time.time()
             d.issues.update(iid, status="acting")
             args, pcall = plan["args"], Call(issue_id=iid, origin="agent")
@@ -163,6 +173,7 @@ class Agent:
             res = await execute(d, plan["tool"], args, pcall)
             if res.get("blocked"):
                 break
+            attempts += 1
             if res.get("ok"):
                 d.issues.update(iid, status="verifying")
                 ok = await self.verify(iid, [lane], since)
