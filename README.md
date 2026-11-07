@@ -21,7 +21,7 @@ UI 標頭會如實顯示 `REAL · provider/model` 或 `MOCK`（雲端失敗退�
 | | 情境 | 展示 |
 |---|---|---|
 | A | 推論卡死 | Agent 自動：偵測 → 查證 → `restart_pipeline`(L1) → Verify → 報告 |
-| B→C | 攝影機無訊號 | 重連失敗 2 次 → Operator → 無法處理／逾時 → 遠端工程師 bundle |
+| B→C | 攝影機無訊號 | 重連失敗（預設 2 次，由 `max_attempts` 調整）→ Operator → 無法處理／逾時 → 遠端工程師 bundle |
 | D | 對話查詢 | logs／metrics／traces／歷史 issue／歷史對話／版本；rollback 需 Operator 確認 |
 | E | 壞設定 | 偵測數驟降 → 關聯近期變更 → 附 diff 與證據自動 rollback → Verify |
 | 安全 | prompt 分層、guard、功能開關 | 輸入／輸出／外部內容檢查，越權意圖被擋，設定檔關閉功能 |

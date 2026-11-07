@@ -10,7 +10,6 @@
 |---|---|---|
 | `AICAM_CONFIG` | 設定檔路徑 | 容器 `/app/config/agent.toml` |
 | `DB_PATH` / `SIM_URL` | SQLite 路徑／邊緣控制 API | `/data/agent.db`／`http://sim:8001` |
-| `SIM_RECONNECT_RETRIES` | sim：reconnect 失敗訊息中顯示的重試次數（改後需 `make up` 重建 sim 容器） | `3` |
 | `AICAM_ENV_FILE` | Reset 時讀取的 `.env` 路徑（compose 已將 `./.env` 唯讀掛到 `/app/.env`） | `/app/.env` |
 | `LLM_PROVIDER` | `mock`｜`auto`｜`anthropic`｜`openai`｜`openrouter` | `mock`（`.env.example`） |
 | `ANTHROPIC_API_KEY` `OPENAI_API_KEY` `OPENROUTER_API_KEY` | 雲端 LLM 金鑰（只放 `.env`） | 空 |

@@ -1,8 +1,6 @@
 """可調校的 demo 速度旋鈕：max_attempts、只由 TOML 決定的時間設定、sim 重試次數、重啟摘要事件。"""
 import asyncio
-import importlib.util
 from dataclasses import replace
-from pathlib import Path
 
 from aicam.adapters.llm import AutoLLM, MockLLM
 from aicam.config import load_settings
@@ -91,17 +89,6 @@ def test_reload_applies_new_timing(d, tmp_path):
     d.s = replace(d.s, config_path=str(f))
     d.reload()
     assert d.s.verify_wait == 4.5 and d.s.max_attempts == 1
-
-
-def test_sim_reconnect_retry_count_is_configurable(monkeypatch):
-    from fastapi.testclient import TestClient
-    monkeypatch.setenv("SIM_RECONNECT_RETRIES", "5")
-    spec = importlib.util.spec_from_file_location("sim_app5", Path(__file__).resolve().parent.parent / "sim" / "app.py")
-    m = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(m)
-    c = TestClient(m.app)
-    c.post("/fault/camera_no_signal?lane=1")
-    assert c.post("/control/reconnect_stream?lane=1").json()["msg"] == "no signal after 5 retries"
 
 
 # ---------- 重啟 recover：使用者要看得到發生了什麼 ----------

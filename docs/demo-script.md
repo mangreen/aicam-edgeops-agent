@@ -86,7 +86,7 @@
 | `operator_timeout` | 30 | 15～30 | Operator 逾時多久自動呼叫遠端工程師（demo 通常手動按「無法處理」） |
 
 實測（真實 sim）：A 自動修復 14.0 秒 → **10.0 秒**；B→C 的 Operator 請求出現 7.0 秒 → **4.9 秒**，且只重連 1 次（時間軸會顯示「第 1/1 次嘗試」）。
-sim 的 `reconnect` 失敗訊息預設寫 `no signal after 3 retries`，可在 `.env` 設 `SIM_RECONNECT_RETRIES=1`（改後 `make up` 重建容器）；這只影響訊息文字。
+sim 的 `reconnect` 失敗訊息會回報**實際**收到的重連次數（`no signal after 1 reconnect attempt`、`… 2 reconnect attempts`），次數由 `max_attempts` 決定，不需要另外設定。
 注意：先前 `.env.example` 內的 `VERIFY_WAIT`／`OPERATOR_TIMEOUT` 已不再生效，請只改 `agent.toml`。
 
 ## 3. 失敗備案

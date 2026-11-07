@@ -11,7 +11,6 @@ from fastapi import FastAPI, HTTPException
 
 AGENT_URL = os.getenv("AGENT_URL", "http://agent:8000")
 TICK = float(os.getenv("SIM_TICK", "2"))
-RECONNECT_RETRIES = int(os.getenv("SIM_RECONNECT_RETRIES", "3"))   # 模擬 reconnect 內部重試次數（只影響回報文字）
 BASE_AREA = 640 * 300
 LANES = (1, 2)
 DEFAULT_CFG = {"model": "vehicle-det-1.2.0", "policy": {"l1_max_per_10min": 2},
@@ -27,7 +26,7 @@ async def lifespan(_app):
 
 app = FastAPI(title="aicam-sim", lifespan=lifespan)
 S = {"cfg": DEFAULT_CFG, "buf": {"logs": [], "metrics": [], "spans": []}, "tick": 0,
-     "lanes": {i: {"camera": True, "pipeline": True, "retry": 0} for i in LANES}}
+     "lanes": {i: {"camera": True, "pipeline": True, "retry": 0, "reconnects": 0} for i in LANES}}
 
 
 def log(lane, level, msg):
@@ -110,7 +109,7 @@ def fault(name: str, lane: int = 1):
         st["pipeline"] = False
         log(lane, "ERROR", "inference worker stalled: queue depth growing, 0 frames processed")
     elif name == "camera_no_signal":
-        st["camera"], st["retry"] = False, 0
+        st["camera"], st["retry"], st["reconnects"] = False, 0, 0
         log(lane, "ERROR", "stream disconnected: no signal from camera (rtsp timeout)")
     else:
         raise HTTPException(400, f"unknown fault {name}")
@@ -129,8 +128,11 @@ def restart_pipeline(lane: int):
 def reconnect_stream(lane: int):
     st = _lane(lane)
     if not st["camera"]:
-        log(lane, "WARN", f"reconnect failed: no signal after {RECONNECT_RETRIES} retries")
-        return {"ok": False, "msg": f"no signal after {RECONNECT_RETRIES} retries"}
+        st["reconnects"] += 1               # 實際收到的 reconnect 請求數（自故障注入起算），訊息據此回報，不是設定值
+        n = st["reconnects"]
+        msg = f"no signal after {n} reconnect attempt{'' if n == 1 else 's'}"
+        log(lane, "WARN", f"reconnect failed: {msg}")
+        return {"ok": False, "msg": msg}
     log(lane, "INFO", "stream reconnected")
     return {"ok": True, "msg": "stream reconnected"}
 
@@ -140,6 +142,7 @@ def physical_fix(lane: int):
     """模擬現場人員修好電源／PoE／網路線（POC 專用）。"""
     st = _lane(lane)
     st["camera"] = st["pipeline"] = True
+    st["reconnects"] = 0
     log(lane, "INFO", "camera link restored (physical fix)")
     return {"ok": True}
 
@@ -154,6 +157,6 @@ def put_config(cfg: dict):
 @app.post("/control/reset")
 def reset():
     for st in S["lanes"].values():
-        st.update(camera=True, pipeline=True, retry=0)
+        st.update(camera=True, pipeline=True, retry=0, reconnects=0)
     S["cfg"] = DEFAULT_CFG
     return {"ok": True}
