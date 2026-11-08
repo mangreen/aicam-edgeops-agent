@@ -1,22 +1,60 @@
 # aicam-edgeops-agent（POC）
 
-地端 AI Agent，自動排除 AI 攝影機系統（得來速計時等）的故障：
-**Agent 自動修復 → Operator 現場協助 → 遠端工程師（附 incident bundle）**；可查詢 logs／metrics／traces／歷史 issue／歷史對話；
-所有設定變更自動快照，可查詢、可 rollback。工具、RAG、Skill、MCP 介面、prompt、安全檢查皆可由設定檔插拔。
+這是一款地端 AI Agent，專為自動排除 AI 攝影機系統（如：得來速計時等）故障所設計。
 
-> **POC 專用**：`sim/`（邊緣端模擬與故障注入）與 Mock LLM（決定性規則＋模板）不屬於正式執行路徑。離線時使用 Mock；有網路可接 Claude／OpenAI／OpenRouter。
-> 開發環境無法驗證 Docker 與真雲端 LLM，見 [`todo.md`](todo.md)。
+## 核心機制
+
+- **階層式修復：** ***Agent 自動修復 → Operator 現場協助 → 遠端工程師（附 incident bundle）***。
+- **觀測與追溯：** 支援查詢 logs、metrics、traces、歷史 issue 及歷史對話。
+- **版本控制：** 所有設定變更皆會自動快照，支援查詢與 rollback（回滾）。
+- **高度模組化：** 工具、RAG、Skill、MCP 介面、prompt、安全檢查皆可透過設定檔自由插拔。
+
+## POC 專用限制
+
+- `sim/`（邊緣端模擬與故障注入）與 Mock LLM（決定性規則＋模板）僅供 POC 使用，不屬於正式執行路徑。
+- **網路模式：**
+  - 離線時：自動使用 Mock LLM。
+  - 連線時：可接 `Claude`、`OpenAI` 或 `OpenRouter`。
+- **開發限制：** 目前開發環境無法驗證 Docker 與真雲端 LLM，詳見 `todo.md`。
 
 ## 快速開始（Host 只需 Docker Desktop 與瀏覽器）
+
 ```bash
 make up        # 首次需網路 build；自動建立 .env（預設 LLM_PROVIDER=mock，離線可跑）
 open http://localhost:8000
 make test      # 在 Docker 內跑 pytest（不需要 Host Python）
+make down      # 關閉服務
 ```
-本機調校（加速 demo、關閉工具、功能開關…）請寫在 `config/agent.local.toml`（`cp config/agent.toml config/agent.local.toml`，git 忽略；不存在就只用 `agent.toml`），見 [`docs/config-reference.md`](docs/config-reference.md)。
-有網路想用真模型：編輯 `.env` → `LLM_PROVIDER=auto` 並填一組 API key → `make up`。
-UI 標頭會如實顯示 `REAL · provider/model` 或 `MOCK`（雲端失敗退回時顯示 `MOCK（… 失敗，已退回）`，游標移上去可看原因）。
-**改了 `.env` 或雲端曾失敗退回 Mock：按 UI 的 Reset（或 🛡安全 →「重新載入 LLM」）即可依 `.env` 重建，不必 `make down`／`make up`。**離線攜帶：`make pack` → 離線機 `make load && make up-offline`。
+
+### 🛠️ 本機調校（加速 demo、關閉工具、功能開關…）
+
+請將自訂設定寫在 config/agent.local.toml：
+
+- **💡 使用方式：** `cp config/agent.toml config/agent.local.toml`（此檔案已被 git 忽略；若不存在則預設僅載入 agent.toml）。詳情請見 `docs/config-reference.md`。
+
+### 🌐 切換真實模型（有網路環境）
+
+1. `cp .env.example .env`
+2. 編輯 `.env` 檔案
+3. 設定 `LLM_PROVIDER=auto` 並填入對應的 API key
+4. 執行 `make up`
+
+#### 📊 UI 狀態顯示說明
+
+- UI 標頭會如實顯示`REAL · provider/model` 或 `MOCK`。
+- 當雲端連線失敗退回時，會顯示 `MOCK（… 失敗，已退回）`，***將游標移上去即可查看原因***。
+
+#### 🔄 熱重載機制
+
+改了 `.env` 或雲端曾失敗退回 Mock 時，只需按下 UI 的 ***「Reset」***（或 🛡️安全 →「重新載入 LLM」）即可依 .env 重建，不必重新執行 `make down`／`make up`。
+
+### 📦 離線攜帶
+
+在有網路環境封裝後，即可帶至離線機部署：
+```bash
+make pack                       # 在有網環境打包
+make load && make up-offline    # 在離線環境載入並啟動
+```
 
 ## 情境
 | | 情境 | 展示 |
