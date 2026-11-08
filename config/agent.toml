@@ -1,4 +1,7 @@
-# aicam-edgeops-agent 主設定。修改後可由 UI「能力」面板或 POST /api/admin/reload 熱重載（P2 起）。
+# aicam-edgeops-agent 主設定（出貨的 demo 預設）。
+# 本機調校請複製成 config/agent.local.toml（git 忽略）再改，不要直接改這個檔；
+# local 存在時會疊加在這個檔之上（只需列出要改的鍵）。
+# 修改後可由 UI「⚙ 能力」面板或 POST /api/admin/reload 熱重載。
 # 機密（API key）只放環境變數 / .env，不要寫在這裡。
 
 [runtime]

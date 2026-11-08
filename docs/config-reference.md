@@ -1,6 +1,23 @@
 # 設定參考
 
-主設定檔：`config/agent.toml`（容器內為 `/app/config/agent.toml`，compose 以唯讀 bind mount 掛入，可直接用編輯器修改）。
+主設定檔：`config/agent.toml`（容器內為 `/app/config/agent.toml`），本機調校寫在選用的 `config/agent.local.toml`（見下）。compose 以唯讀 bind mount 掛入整個 `./config` 目錄，用編輯器修改即可。
+## 本機覆寫：`config/agent.local.toml`
+`agent.toml` 是出貨的 demo 預設，**請不要為了本機調校直接改它**（會讓 `git status` 變髒、`git pull` 衝突）。
+要改數值時，把它複製一份改名即可：
+
+```bash
+cp config/agent.toml config/agent.local.toml   # 可整份保留，也可只留下你要改的幾行
+```
+
+- `agent.local.toml` 已加入 `.gitignore`，存在時會**疊加**在 `agent.toml` 之上；不存在就只用 `agent.toml`（`make up` 不需要任何額外步驟）。
+- 合併規則：table 逐鍵合併，數值與清單整個取代。例如 local 只寫 `[runtime]\nmax_attempts = 1` 就只改這一個值；寫 `[tools]\nrestart_pipeline = false` 只影響那一個工具；寫 `[skills]\nenabled = ["x"]` 則取代整份啟用清單。
+- 建議只放你要改的鍵：這樣 `git pull` 取得的新預設值會自動生效，不會被舊的完整複本蓋掉。
+- 環境變數 `AICAM_CONFIG_LOCAL` 可指定其他覆寫檔路徑，設成空字串則停用（測試使用）。
+- prompts／skills 目錄仍以 `agent.toml` 所在資料夾為準。
+- UI「⚙ 能力」會顯示實際載入的檔案（覆寫檔以 ✎ 標示）。
+
+**遷移：** 如果你之前直接改了 `agent.toml`，請先把改動搬到 `agent.local.toml`，再用 `git checkout config/agent.toml` 還原，之後才能順利 `git pull`／`git am`。
+
 修改後：UI「⚙ 能力」→「重載設定檔」，或 `POST /api/admin/reload`（需 `features.admin_reload = true`）。
 設定有誤時重載會失敗並維持原設定（回 400 與原因）。**機密只放環境變數／`.env`，不要寫在 TOML。**
 

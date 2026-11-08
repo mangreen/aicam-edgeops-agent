@@ -23,7 +23,7 @@ Host 只需 Docker Desktop 與瀏覽器。（macOS 內建的 `pip`／`python` �
 2. 離線機器：`make load` → `make up-offline`。
 
 ## 修改設定
-- 設定檔 `config/agent.toml` 以唯讀 bind mount 掛入容器，直接用編輯器修改，再於 UI ⚙能力 按「重載設定檔」。欄位說明見 `docs/config-reference.md`。
+- 本機調校請寫在 `config/agent.local.toml`（`cp config/agent.toml config/agent.local.toml`，git 忽略，只留要改的鍵即可；不存在就只用 `agent.toml`），不要直接改 `agent.toml`。`./config` 目錄以唯讀 bind mount 掛入容器，改完在 UI ⚙能力 按「重載設定檔」。欄位說明與合併規則見 `docs/config-reference.md`。
 - 改 `.env`（LLM provider／金鑰）：`.env` 以唯讀掛入容器，按 UI **Reset**（或 🛡安全 →「重新載入 LLM」，或 `POST /api/llm/reset`）即依 `.env` 重建 LLM，**不必重啟容器**；`.env` 的值優先於容器建立時的環境變數。
   - 若編輯器以「換檔」方式存檔（部分 vim 設定）導致容器仍看到舊內容：`docker compose restart agent`。
   - 其他非 LLM 的環境變數（`DB_PATH`、`SIM_URL`…）仍需 `make up` 重新建立容器。

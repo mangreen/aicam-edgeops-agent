@@ -46,7 +46,7 @@
 在對應位置插入。
 
 ### 2.1 設定檔關閉工具 → Agent 改走 Operator（插在 A 之後，約 1.5 分鐘）
-1. ⚙能力 分頁：找到 `restart_pipeline`（L1，Agent）→ 按「**停用**」（或在編輯器把 `config/agent.toml` 的 `[tools]` 加上 `restart_pipeline = false`，存檔後按「重載設定檔」）。
+1. ⚙能力 分頁：找到 `restart_pipeline`（L1，Agent）→ 按「**停用**」（或在 `config/agent.local.toml` 加上 `[tools]` 區段與 `restart_pipeline = false`，存檔後按「重載設定檔」）。
 2. 按「**A 推論卡死**」。預期：時間軸 `plan` 顯示「升級（工具 restart_pipeline 已停用…）」，Operator 面板出現請求 → 按「**已處理**」→ Verify 通過、結案。
 3. 回 ⚙能力 按「啟用」恢復（或重載設定檔，會清除執行期覆寫）。
 講稿：不同客戶／環境可用設定檔決定 Agent 能用哪些工具；被停用的工具對 LLM 不可見、對 executor 不可執行。
@@ -66,9 +66,9 @@
 講稿：log 是外部內容，進入 LLM 前先檢查、隔離，只能當證據，不能當指令。
 
 ### 2.4 功能開關：關閉 Operator 聊天（約 1 分鐘）
-1. 編輯器開 `config/agent.toml`，把 `[features]` 的 `chat = true` 改為 `chat = false`，存檔。
+1. 在 `config/agent.local.toml` 寫入 `[features]` 區段與 `chat = false`（沒有這個檔就先複製 `agent.toml`），存檔。
 2. ⚙能力 →「重載設定檔」→ 💬對話分頁消失；`curl -s -X POST localhost:8000/api/chat -H 'content-type: application/json' -d '{"text":"hi"}'` 回 403 `feature disabled: chat`。
-3. 改回 `true` 並重載。
+3. 刪除該行（或改回 `true`）並重載。
 講稿：超出 Operator 權限的功能（聊天、改 prompt、重載、工具啟停、連線測試、demo 控制）全由設定檔開關；POC 不做帳號系統。
 
 ### 2.5 版本頁的 rollback 按鈕（約 30 秒）
@@ -76,7 +76,16 @@
 
 ---
 
-## 2.6 加速 demo 的設定（`config/agent.toml` 的 `[runtime]`，改後按 ⚙能力 →「重載設定檔」立即生效）
+## 2.6 加速 demo 的設定
+寫在 `config/agent.local.toml`（`cp config/agent.toml config/agent.local.toml`，只留下要改的鍵即可，例如下面四行；git 不追蹤）。改後按 ⚙能力 →「重載設定檔」立即生效：
+
+```toml
+[runtime]
+detect_samples = 2
+verify_wait = 5
+max_attempts = 1
+```
+
 
 | 設定 | 預設 | 加速建議 | 效果與限制 |
 |---|---|---|---|
@@ -87,7 +96,7 @@
 
 實測（真實 sim）：A 自動修復 14.0 秒 → **10.0 秒**；B→C 的 Operator 請求出現 7.0 秒 → **4.9 秒**，且只重連 1 次（時間軸會顯示「第 1/1 次嘗試」）。
 sim 的 `reconnect` 失敗訊息會回報**實際**收到的重連次數（`no signal after 1 reconnect attempt`、`… 2 reconnect attempts`），次數由 `max_attempts` 決定，不需要另外設定。
-注意：先前 `.env.example` 內的 `VERIFY_WAIT`／`OPERATOR_TIMEOUT` 已不再生效，請只改 `agent.toml`。
+注意：先前 `.env.example` 內的 `VERIFY_WAIT`／`OPERATOR_TIMEOUT` 已不再生效，請只改 `agent.local.toml`（或 `agent.toml`）。
 
 ## 3. 失敗備案
 
