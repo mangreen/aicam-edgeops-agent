@@ -54,8 +54,9 @@ class Settings:
     detector: DetectorCfg = field(default_factory=DetectorCfg)
     policy: PolicyCfg = field(default_factory=PolicyCfg)
     ingest: IngestCfg = field(default_factory=IngestCfg)
-    raw: dict = field(default_factory=dict)   # 完整 TOML，供 plugins / guards / rbac 解析
-    config_path: str = ""
+    raw: dict = field(default_factory=dict)   # 合併後的完整 TOML，供 plugins / guards / rbac 解析
+    config_path: str = ""                     # 基礎設定檔（prompts／skills 目錄以它所在的資料夾為準）
+    config_files: tuple = ()                  # 實際載入的檔案：基礎檔，以及存在時的 *.local.toml
 
     def feature(self, name: str) -> bool:
         return bool(self.raw.get("features", {}).get(name, FEATURE_DEFAULTS[name]))
@@ -64,18 +65,49 @@ class Settings:
         return self.raw.get(name, {})
 
 
+class ConfigFileError(ValueError):
+    """設定檔語法錯誤；訊息含檔名，方便知道是基礎檔還是本機覆寫檔。"""
+
+
 def _read_toml(path: str) -> dict:
     p = Path(path)
     if not path or not p.is_file():
         return {}
-    with p.open("rb") as f:
-        return tomllib.load(f)
+    try:
+        with p.open("rb") as f:
+            return tomllib.load(f)
+    except tomllib.TOMLDecodeError as e:
+        raise ConfigFileError(f"{path}: {e}") from e
+
+
+def deep_merge(base: dict, over: dict) -> dict:
+    """table 逐鍵遞迴合併；數值與清單整個取代（例如 [skills] enabled 在 local 出現就取代整份清單）。"""
+    out = dict(base)
+    for k, v in over.items():
+        out[k] = deep_merge(out[k], v) if isinstance(v, dict) and isinstance(out.get(k), dict) else v
+    return out
+
+
+def local_config_path(path: str, env) -> str:
+    """本機覆寫檔：agent.toml → agent.local.toml（已加入 .gitignore）。
+    `AICAM_CONFIG_LOCAL` 可指定其他路徑；設成空字串＝停用（測試用，避免本機設定影響結果）。"""
+    if not path:
+        return ""
+    if "AICAM_CONFIG_LOCAL" in env:
+        return env["AICAM_CONFIG_LOCAL"]
+    p = Path(path)
+    return str(p.with_name(f"{p.stem}.local{p.suffix}"))
 
 
 def load_settings(path: str | None = None, env=None) -> Settings:
     env = os.environ if env is None else env
     path = path or env.get("AICAM_CONFIG", "config/agent.toml")
     raw = _read_toml(path)
+    files = [path] if path and Path(path).is_file() else []
+    local = local_config_path(path, env)
+    if local and Path(local).is_file():          # 有本機覆寫檔才疊加；沒有就直接用基礎設定檔
+        raw = deep_merge(raw, _read_toml(local))
+        files.append(local)
     rt = raw.get("runtime", {})
     s = Settings(
         db_path=env.get("DB_PATH", rt.get("db_path", "/data/agent.db")),
@@ -91,7 +123,7 @@ def load_settings(path: str | None = None, env=None) -> Settings:
         detector=DetectorCfg(**raw.get("detector", {})),
         ingest=IngestCfg(**raw.get("ingest", {})),
         policy=PolicyCfg(**{**raw.get("policy", {}), **({"agent_writable": tuple(raw["policy"]["agent_writable"])} if "agent_writable" in raw.get("policy", {}) else {})}),
-        raw=raw, config_path=path,
+        raw=raw, config_path=path, config_files=tuple(files),
     )
     return s
 

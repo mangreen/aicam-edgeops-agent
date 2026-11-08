@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 from pathlib import Path
@@ -5,6 +6,8 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "agent" / "src"))
+# 測試只讀出貨的 config/agent.toml：停用本機覆寫檔，避免開發者的 agent.local.toml 影響測試結果
+os.environ["AICAM_CONFIG_LOCAL"] = ""
 from dataclasses import replace
 
 from aicam.adapters.llm import AutoLLM

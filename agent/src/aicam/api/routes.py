@@ -203,7 +203,7 @@ def features(request: Request):
 @router.get("/api/capabilities")
 def capabilities(request: Request):
     d = rt(request)
-    return {"tools": d.tools.describe(), "config_path": d.s.config_path,
+    return {"tools": d.tools.describe(), "config_path": d.s.config_path, "config_files": list(d.s.config_files),
             "skills": [{"name": k.name, "description": k.description, "tools": list(k.tools), "enabled": k.enabled,
                         "active": k.active, "reason": k.reason} for k in d.skills],
             "knowledge_sources": d.s.section("knowledge").get("sources", "all")}
@@ -216,7 +216,8 @@ def reload_config(request: Request):
         d.reload()
     except (ConfigError, OSError, ValueError) as e:
         raise HTTPException(400, f"設定載入失敗，維持原設定：{e}") from e
-    d.issues.event(None, "config", "已重新載入設定檔（runtime override 已清除）")
+    files = "、".join(d.s.config_files) or "（無）"
+    d.issues.event(None, "config", f"已重新載入設定檔：{files}（runtime override 已清除）")
     return {"ok": True, "tools": len(d.tools)}
 
 
